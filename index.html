@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>TETRIS × Lovense</title>
+<style>
+  :root{
+    --bg:#07060f;
+    --panel:#12102180;
+    --neon:#00e5ff;
+    --neon2:#ff2fd0;
+    --gold:#ffd23f;
+    --grid:#221f3a;
+    --text:#e8e6ff;
+    --muted:#8f8bb8;
+    --ok:#2fffb0;
+    --err:#ff5470;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1200px 800px at 50% -10%, #1a1440 0%, transparent 60%),
+      radial-gradient(900px 700px at 110% 120%, #2a0a3a 0%, transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:"Segoe UI",system-ui,sans-serif;
+    display:flex;align-items:center;justify-content:center;
+    padding:16px;min-height:100%;
+    -webkit-user-select:none;user-select:none;
+  }
+  .wrap{
+    display:grid;grid-template-columns:auto 260px;gap:18px;align-items:start;
+  }
+  h1{
+    font-size:22px;letter-spacing:3px;margin:0 0 10px;
+    background:linear-gradient(90deg,var(--neon),var(--neon2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-transform:uppercase;font-weight:800;
+  }
+  .stage{position:relative}
+  canvas{
+    background:linear-gradient(180deg,#0b0920,#0a0818);
+    border:2px solid #2b2750;border-radius:14px;
+    box-shadow:0 0 40px #00e5ff22, inset 0 0 60px #0006;
+    display:block;
+  }
+  .overlay{
+    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    flex-direction:column;gap:12px;text-align:center;
+    background:#05040ccc;border-radius:14px;backdrop-filter:blur(3px);
+  }
+  .overlay.show{display:flex}
+  .overlay h2{margin:0;font-size:26px;letter-spacing:2px}
+  .btn{
+    cursor:pointer;border:1px solid #3a3670;border-radius:10px;
+    background:#1a1638;color:var(--text);padding:9px 14px;font-size:14px;
+    transition:.15s;font-weight:600;
+  }
+  .btn:hover{border-color:var(--neon);box-shadow:0 0 14px #00e5ff55}
+  .btn.primary{background:linear-gradient(90deg,var(--neon),var(--neon2));color:#06040f;border:none}
+  .btn.danger{background:#2a0e18;border-color:var(--err);color:var(--err)}
+  .btn.danger:hover{box-shadow:0 0 14px #ff547066}
+  .side{display:flex;flex-direction:column;gap:14px}
+  .card{
+    background:var(--panel);border:1px solid #2b2750;border-radius:12px;
+    padding:12px;backdrop-filter:blur(6px);
+  }
+  .card h3{margin:0 0 8px;font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .stat{background:#0d0b20;border:1px solid #241f45;border-radius:8px;padding:8px 10px}
+  .stat .k{font-size:10px;color:var(--muted);letter-spacing:1px}
+  .stat .v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+  #nextCanvas{display:block;margin:0 auto;background:#0d0b20;border-radius:8px;border:1px solid #241f45}
+  .row{display:flex;gap:8px;align-items:center}
+  label{font-size:12px;color:var(--muted)}
+  input,select{
+    background:#0d0b20;border:1px solid #2b2750;color:var(--text);
+    border-radius:8px;padding:7px 9px;font-size:13px;width:100%;
+  }
+  input[type=range]{accent-color:var(--neon2);padding:0}
+  input[type=checkbox]{width:auto;accent-color:var(--neon2)}
+  .field{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+  .status{font-size:12px;display:flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);box-shadow:0 0 8px currentColor}
+  .dot.ok{background:var(--ok);color:var(--ok)}
+  .dot.err{background:var(--err);color:var(--err)}
+  .vibemap{font-size:11px;color:var(--muted);line-height:1.8}
+  .vibemap b{color:var(--text)}
+  .vibebar{height:6px;border-radius:4px;background:#0d0b20;overflow:hidden;margin-top:8px;border:1px solid #241f45}
+  .vibebar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--neon),var(--neon2));transition:width .1s}
+  .help{font-size:11px;color:var(--muted);line-height:1.7}
+  kbd{background:#1a1638;border:1px solid #3a3670;border-radius:4px;padding:1px 5px;font-size:10px}
+  .touch{display:none;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+  .touch .btn{padding:14px 0;font-size:18px}
+  @media (max-width:720px){
+    .wrap{grid-template-columns:1fr}
+    .side{order:2}
+    .touch{display:grid}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>Tetris × Lovense</h1>
+    <div class="stage">
+      <canvas id="board" width="300" height="600"></canvas>
+      <div class="overlay show" id="overlay">
+        <h2 id="ovTitle">PRÊT ?</h2>
+        <div id="ovSub" class="help" style="max-width:220px">Connecte ton Lovense à droite, puis lance la partie.</div>
+        <button class="btn primary" id="startBtn">▶ Jouer</button>
+      </div>
+    </div>
+    <div class="touch">
+      <button class="btn" data-act="left">◀</button>
+      <button class="btn" data-act="rotate">⟳</button>
+      <button class="btn" data-act="right">▶</button>
+      <button class="btn" data-act="drop">⤓</button>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="card">
+      <div class="stats">
+        <div class="stat"><div class="k">SCORE</div><div class="v" id="score">0</div></div>
+        <div class="stat"><div class="k">LIGNES</div><div class="v" id="lines">0</div></div>
+        <div class="stat"><div class="k">NIVEAU</div><div class="v" id="level">1</div></div>
+        <div class="stat"><div class="k">TÉTRIS ×</div><div class="v" id="combo">0</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Suivant</h3>
+      <canvas id="nextCanvas" width="120" height="90"></canvas>
+    </div>
+
+    <div class="card">
+      <h3>Lovense — Game Mode</h3>
+      <div class="field">
+        <label>IP locale</label>
+        <input id="ip" value="192.168.1.28">
+      </div>
+      <div class="field">
+        <label>Transport</label>
+        <select id="transport">
+          <option value="https">HTTPS · lovense.club:30010</option>
+          <option value="http">HTTP direct · :20010</option>
+        </select>
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn primary" id="connectBtn" style="flex:1">Connecter</button>
+        <button class="btn" id="testBtn">Test</button>
+      </div>
+      <button class="btn danger" id="stopBtn" style="width:100%">■ STOP d'urgence</button>
+      <div class="status" style="margin-top:10px"><span class="dot" id="dot"></span><span id="statusTxt">Non connecté</span></div>
+      <div class="vibebar"><i id="vibebar"></i></div>
+    </div>
+
+    <div class="card">
+      <h3>Calibrage</h3>
+      <div class="field">
+        <label>Intensité max · <span id="maxLbl">100%</span></label>
+        <input id="maxRange" type="range" min="0" max="100" value="100">
+      </div>
+      <label class="row" style="cursor:pointer;gap:8px">
+        <input id="warmup" type="checkbox">
+        <span style="font-size:12px;color:var(--text)">Warm-up — fond léger qui monte avec le niveau</span>
+      </label>
+    </div>
+
+    <div class="card">
+      <h3>Intensités</h3>
+      <div class="vibemap">
+        <b>Pose de pièce</b> → 10%<br>
+        <b>1 ligne</b> → 20% · <b>2</b> → 30%<br>
+        <b>3 lignes</b> → 40% · <b>4 (Tétris)</b> → 70%<br>
+        <b>Tétris à la suite</b> → 100% 🔥
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Commandes</h3>
+      <div class="help">
+        <kbd>←</kbd> <kbd>→</kbd> déplacer · <kbd>↓</kbd> soft drop<br>
+        <kbd>↑</kbd>/<kbd>X</kbd> rotation · <kbd>Espace</kbd> hard drop<br>
+        <kbd>P</kbd> pause
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   LOVENSE CONTROLLER — Game Mode Local API
+   POST {base}/command
+   GetToys : {command:"GetToys"}
+   Vibrate : {command:"Function", action:"Vibrate:N"(0-20), timeSec, toy:"", apiVer:1}
+   Stop    : {command:"Function", action:"Stop", timeSec:0, toy:"", apiVer:1}
+   ============================================================ */
+const Lovense = (() => {
+  let connected = false;
+  let base = "";
+  let stopTimer = null;
+  let baseline = 0;    // fond warm-up (pct 0-100)
+  let scale = 1;       // intensité max (0..1)
+  let warmup = false;
+
+  function buildBase(ip, transport){
+    if(transport === "http") return `http://${ip}:20010`;
+    const dashed = ip.trim().replace(/\./g, "-");   // IP en tirets → cert lovense.club valide
+    return `https://${dashed}.lovense.club:30010`;
+  }
+
+  async function post(body){
+    const res = await fetch(`${base}/command`, {
+      method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body),
+    });
+    return res.json();
+  }
+
+  async function connect(ip, transport){
+    base = buildBase(ip, transport);
+    const data = await post({ command:"GetToys" });
+    if(data && data.code === 200){
+      connected = true;
+      let names = "";
+      try{
+        const toys = JSON.parse(data.data.toys);
+        names = Object.values(toys).map(t => t.name || t.id).join(", ");
+      }catch(e){}
+      return { ok:true, names };
+    }
+    connected = false;
+    return { ok:false, raw:data };
+  }
+
+  const level = pct => Math.max(0, Math.min(20, Math.round(pct/5)));  // 0-100% → 0-20
+
+  async function raw(pct){          // envoi direct, intensité max appliquée
+    if(!connected) return;
+    const lv = level(pct * scale);
+    try{
+      if(lv <= 0) await post({ command:"Function", action:"Stop", timeSec:0, toy:"", apiVer:1 });
+      else        await post({ command:"Function", action:`Vibrate:${lv}`, timeSec:0, toy:"", apiVer:1 });
+    }catch(e){}
+  }
+  function toBaseline(){ raw(baseline); UI.vibeBar(baseline * scale); }
+
+  // Impulsion : vibre à pct pendant durMs puis retombe sur le fond warm-up
+  function pulse(pct, durMs){
+    if(!connected) return;
+    if(stopTimer){ clearTimeout(stopTimer); stopTimer = null; }
+    raw(pct); UI.vibeBar(pct * scale);
+    stopTimer = setTimeout(() => { toBaseline(); stopTimer = null; }, durMs);
+  }
+
+  // Climax : plusieurs tétris à la suite → 100% en pulsations
+  function climax(){
+    if(!connected) return;
+    if(stopTimer){ clearTimeout(stopTimer); stopTimer = null; }
+    const seq = [ [100,260],[60,110],[100,300],[70,120],[100,420] ];
+    let t = 0;
+    seq.forEach(([p,d]) => { setTimeout(() => { raw(p); UI.vibeBar(p*scale); }, t); t += d; });
+    stopTimer = setTimeout(() => { toBaseline(); stopTimer = null; }, t);
+  }
+
+  function mute(){                  // silence temporaire (pause / game over) — garde la config
+    if(stopTimer){ clearTimeout(stopTimer); stopTimer = null; }
+    if(connected) post({ command:"Function", action:"Stop", timeSec:0, toy:"", apiVer:1 }).catch(()=>{});
+    UI.vibeBar(0);
+  }
+  function unmute(){ toBaseline(); }
+
+  async function stop(){            // STOP d'urgence — coupe tout + désarme le warm-up
+    if(stopTimer){ clearTimeout(stopTimer); stopTimer = null; }
+    baseline = 0; warmup = false;
+    if(connected){ try{ await post({ command:"Function", action:"Stop", timeSec:0, toy:"", apiVer:1 }); }catch(e){} }
+    UI.vibeBar(0);
+  }
+
+  // ---- calibrage ----
+  function setScale(pct){ scale = Math.max(0, Math.min(1, pct/100)); if(!stopTimer) toBaseline(); }
+  function setWarmup(on){ warmup = on; }
+  function updateWarmup(lvl){       // recalcule le fond selon le niveau : 5% puis +3%/niveau, plafond 45%
+    baseline = warmup ? Math.min(45, 5 + (lvl-1)*3) : 0;
+    if(!stopTimer) toBaseline();
+  }
+
+  return { connect, pulse, climax, mute, unmute, stop, setScale, setWarmup, updateWarmup, isConnected:()=>connected };
+})();
+
+/* ============================================================
+   UI helpers
+   ============================================================ */
+const UI = {
+  el:id=>document.getElementById(id),
+  set(id,v){ this.el(id).textContent = v; },
+  status(state, txt){
+    const dot = UI.el("dot");
+    dot.className = "dot" + (state==="ok"?" ok":state==="err"?" err":"");
+    UI.el("statusTxt").textContent = txt;
+  },
+  vibeBar(pct){ UI.el("vibebar").style.width = pct + "%"; }
+};
+
+/* ============================================================
+   TETRIS
+   ============================================================ */
+const COLS = 10, ROWS = 20, CELL = 30;
+const board = document.getElementById("board");
+const ctx = board.getContext("2d");
+const nextCv = document.getElementById("nextCanvas");
+const nctx = nextCv.getContext("2d");
+
+const COLORS = {
+  I:"#00e5ff", O:"#ffd23f", T:"#c56bff", S:"#2fffb0",
+  Z:"#ff5470", J:"#4b7bff", L:"#ff9f43"
+};
+// Matrices (rotation par rotation de matrice)
+const PIECES = {
+  I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+  O:[[1,1],[1,1]],
+  T:[[0,1,0],[1,1,1],[0,0,0]],
+  S:[[0,1,1],[1,1,0],[0,0,0]],
+  Z:[[1,1,0],[0,1,1],[0,0,0]],
+  J:[[1,0,0],[1,1,1],[0,0,0]],
+  L:[[0,0,1],[1,1,1],[0,0,0]],
+};
+const TYPES = Object.keys(PIECES);
+
+let grid, cur, nextType, bag = [];
+let score, lines, level, comboTetris;
+let dropTimer, dropInterval, running, paused, over;
+
+function newBag(){
+  const t = [...TYPES];
+  for(let i=t.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [t[i],t[j]]=[t[j],t[i]]; }
+  return t;
+}
+function nextFromBag(){
+  if(bag.length===0) bag = newBag();
+  return bag.pop();
+}
+function spawn(){
+  const type = nextType || nextFromBag();
+  nextType = nextFromBag();
+  const shape = PIECES[type].map(r=>[...r]);
+  cur = { type, shape, x: ((COLS - shape[0].length)/2)|0, y:-getTop(shape) };
+  drawNext();
+  if(collide(cur.shape, cur.x, cur.y)){ gameOver(); }
+}
+function getTop(shape){ for(let y=0;y<shape.length;y++) if(shape[y].some(v=>v)) return y; return 0; }
+
+function rotate(shape){
+  const n = shape.length, m = shape[0].length;
+  const r = Array.from({length:m},()=>Array(n).fill(0));
+  for(let y=0;y<n;y++) for(let x=0;x<m;x++) r[x][n-1-y] = shape[y][x];
+  return r;
+}
+function collide(shape, px, py){
+  for(let y=0;y<shape.length;y++) for(let x=0;x<shape[y].length;x++){
+    if(!shape[y][x]) continue;
+    const gx = px+x, gy = py+y;
+    if(gx<0||gx>=COLS||gy>=ROWS) return true;
+    if(gy>=0 && grid[gy][gx]) return true;
+  }
+  return false;
+}
+function move(dx){ if(!collide(cur.shape, cur.x+dx, cur.y)){ cur.x+=dx; draw(); } }
+function softDrop(){
+  if(!collide(cur.shape, cur.x, cur.y+1)){ cur.y++; score+=1; draw(); refresh(); }
+  else lock();
+}
+function hardDrop(){
+  let d=0;
+  while(!collide(cur.shape, cur.x, cur.y+1)){ cur.y++; d++; }
+  score += d*2; draw(); lock();
+}
+function tryRotate(){
+  const r = rotate(cur.shape);
+  for(const k of [0,-1,1,-2,2]){
+    if(!collide(r, cur.x+k, cur.y)){ cur.shape=r; cur.x+=k; draw(); return; }
+  }
+}
+function lock(){
+  for(let y=0;y<cur.shape.length;y++) for(let x=0;x<cur.shape[y].length;x++){
+    if(cur.shape[y][x]){
+      const gy=cur.y+y, gx=cur.x+x;
+      if(gy<0){ gameOver(); return; }
+      grid[gy][gx] = cur.type;
+    }
+  }
+  Lovense.pulse(10, 130);         // 🔔 pose de pièce → 10%
+  clearLines();
+  spawn(); draw();
+}
+function clearLines(){
+  let cleared = 0;
+  for(let y=ROWS-1;y>=0;y--){
+    if(grid[y].every(c=>c)){
+      grid.splice(y,1);
+      grid.unshift(Array(COLS).fill(0));
+      cleared++; y++;
+    }
+  }
+  if(cleared===0){ return; }
+
+  lines += cleared;
+  score += [0,100,300,500,800][cleared] * level;
+
+  // 🔔 Mapping vibration
+  if(cleared===4){
+    comboTetris++;
+    if(comboTetris>=2){ Lovense.climax(); }        // Tétris à la suite → 100% 🔥
+    else { Lovense.pulse(70, 850); }               // Tétris simple → 70%
+  } else {
+    comboTetris = 0;
+    const map = {1:[20,320],2:[30,420],3:[40,600]};
+    const [pct,dur] = map[cleared];
+    Lovense.pulse(pct, dur);
+  }
+
+  // niveau : +1 tous les 10 lignes
+  const nl = 1 + Math.floor(lines/10);
+  if(nl!==level){ level=nl; setSpeed(); Lovense.updateWarmup(level); }
+  refresh();
+}
+function setSpeed(){
+  dropInterval = Math.max(90, 800 - (level-1)*70);
+  if(running && !paused){ clearInterval(dropTimer); dropTimer = setInterval(tick, dropInterval); }
+}
+function tick(){ if(!collide(cur.shape, cur.x, cur.y+1)){ cur.y++; draw(); } else lock(); }
+
+/* ---------- rendu ---------- */
+function roundRect(c,x,y,w,h,r){
+  c.beginPath();
+  c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
+}
+function cell(c, x, y, color, size=CELL){
+  const px=x*size, py=y*size, p=2;
+  c.fillStyle = color;
+  roundRect(c, px+p, py+p, size-2*p, size-2*p, 6); c.fill();
+  c.fillStyle = "#ffffff22";
+  roundRect(c, px+p, py+p, size-2*p, (size-2*p)*0.4, 6); c.fill();
+}
+function draw(){
+  ctx.clearRect(0,0,board.width,board.height);
+  // grille
+  ctx.strokeStyle = "#ffffff08";
+  for(let x=0;x<=COLS;x++){ ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,ROWS*CELL); ctx.stroke(); }
+  for(let y=0;y<=ROWS;y++){ ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(COLS*CELL,y*CELL); ctx.stroke(); }
+  // pile
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) if(grid[y][x]) cell(ctx,x,y,COLORS[grid[y][x]]);
+  if(!cur) return;
+  // ghost
+  let gy=cur.y; while(!collide(cur.shape, cur.x, gy+1)) gy++;
+  ctx.globalAlpha=.18;
+  for(let y=0;y<cur.shape.length;y++) for(let x=0;x<cur.shape[y].length;x++)
+    if(cur.shape[y][x]) cell(ctx, cur.x+x, gy+y, COLORS[cur.type]);
+  ctx.globalAlpha=1;
+  // pièce
+  for(let y=0;y<cur.shape.length;y++) for(let x=0;x<cur.shape[y].length;x++)
+    if(cur.shape[y][x] && cur.y+y>=0) cell(ctx, cur.x+x, cur.y+y, COLORS[cur.type]);
+}
+function drawNext(){
+  nctx.clearRect(0,0,nextCv.width,nextCv.height);
+  const s = PIECES[nextType], size=22;
+  const w=s[0].length*size, h=s.length*size;
+  const ox=(nextCv.width-w)/2, oy=(nextCv.height-h)/2;
+  for(let y=0;y<s.length;y++) for(let x=0;x<s[y].length;x++) if(s[y][x]){
+    nctx.fillStyle = COLORS[nextType];
+    roundRect(nctx, ox+x*size+2, oy+y*size+2, size-4, size-4, 5); nctx.fill();
+  }
+}
+function refresh(){
+  UI.el("score").textContent = score;
+  UI.el("lines").textContent = lines;
+  UI.el("level").textContent = level;
+  UI.el("combo").textContent = comboTetris;
+}
+
+/* ---------- flow ---------- */
+function reset(){
+  grid = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  score=0; lines=0; level=1; comboTetris=0; bag=[]; nextType=null;
+  dropInterval=800; over=false; paused=false;
+  refresh();
+}
+function startGame(){
+  reset(); spawn(); draw();
+  running=true;
+  Lovense.updateWarmup(1);
+  UI.el("overlay").classList.remove("show");
+  clearInterval(dropTimer); dropTimer=setInterval(tick, dropInterval);
+}
+function gameOver(){
+  over=true; running=false; clearInterval(dropTimer);
+  Lovense.mute();
+  UI.el("ovTitle").textContent = "GAME OVER";
+  UI.el("ovSub").textContent = `Score : ${score} · Lignes : ${lines}`;
+  UI.el("startBtn").textContent = "↻ Rejouer";
+  UI.el("overlay").classList.add("show");
+}
+function togglePause(){
+  if(!running) return;
+  paused=!paused;
+  if(paused){ clearInterval(dropTimer); Lovense.mute();
+    UI.el("ovTitle").textContent="PAUSE"; UI.el("ovSub").textContent="Appuie sur P pour reprendre";
+    UI.el("startBtn").style.display="none"; UI.el("overlay").classList.add("show");
+  } else { UI.el("overlay").classList.remove("show"); UI.el("startBtn").style.display="";
+    Lovense.unmute(); dropTimer=setInterval(tick, dropInterval);
+  }
+}
+
+/* ---------- inputs ---------- */
+document.addEventListener("keydown", e=>{
+  if(["ArrowLeft","ArrowRight","ArrowDown","ArrowUp"," "].includes(e.key)) e.preventDefault();
+  if(e.key==="p"||e.key==="P"){ togglePause(); return; }
+  if(!running||paused||over) return;
+  switch(e.key){
+    case "ArrowLeft": move(-1); break;
+    case "ArrowRight": move(1); break;
+    case "ArrowDown": softDrop(); break;
+    case "ArrowUp": case "x": case "X": tryRotate(); break;
+    case " ": hardDrop(); break;
+  }
+});
+document.querySelectorAll(".touch .btn").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    if(!running||paused||over) return;
+    const a=b.dataset.act;
+    if(a==="left") move(-1);
+    if(a==="right") move(1);
+    if(a==="rotate") tryRotate();
+    if(a==="drop") hardDrop();
+  });
+});
+UI.el("startBtn").addEventListener("click", startGame);
+
+/* ---------- Lovense UI ---------- */
+UI.el("connectBtn").addEventListener("click", async ()=>{
+  const ip = UI.el("ip").value.trim();
+  const tr = UI.el("transport").value;
+  UI.status("", "Connexion…");
+  try{
+    const r = await Lovense.connect(ip, tr);
+    if(r.ok){ UI.status("ok", r.names ? `Connecté · ${r.names}` : "Connecté"); }
+    else { UI.status("err", "Réponse inattendue"); }
+  }catch(err){
+    UI.status("err", "Échec — voir notes ci-dessous");
+  }
+});
+UI.el("testBtn").addEventListener("click", ()=> Lovense.pulse(40, 700));
+UI.el("stopBtn").addEventListener("click", ()=>{ Lovense.stop(); UI.el("warmup").checked=false; UI.vibeBar(0); });
+
+UI.el("maxRange").addEventListener("input", e=>{
+  const v=+e.target.value; UI.el("maxLbl").textContent=v+"%"; Lovense.setScale(v);
+});
+UI.el("warmup").addEventListener("change", e=>{
+  Lovense.setWarmup(e.target.checked);
+  Lovense.updateWarmup(level||1);
+});
+
+draw();
+</script>
+</body>
+</html>
