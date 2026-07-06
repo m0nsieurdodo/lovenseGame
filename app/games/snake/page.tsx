@@ -82,10 +82,10 @@ export default function SnakePage() {
       </div>
 
       <div className="flex min-h-0 flex-1 items-center justify-center">
-        <div className="relative leading-[0]">
+        <div className="relative h-full w-full leading-[0]">
           <canvas
             ref={canvasRef}
-            className="block rounded-[14px] border-2 border-[#2b2750] bg-gradient-to-b from-[#0b0920] to-[#0a0818]"
+            className="mx-auto block h-full rounded-[14px] border-2 border-[#2b2750] bg-gradient-to-b from-[#0b0920] to-[#0a0818]"
             style={{ boxShadow: "0 0 40px #00e5ff22, inset 0 0 60px #0006", touchAction: "none" }}
           />
           {overlay.show && (

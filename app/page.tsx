@@ -9,7 +9,9 @@ import { Button, StatusDot } from "@/components/ui";
 
 export default function HubPage() {
   const { status, statusText } = useLovense();
-  const [showSettings, setShowSettings] = useState(false);
+  // Panneau ouvert par défaut : la connexion Lovense ne persiste pas au
+  // rechargement, et ne se fait que depuis le Hub (jamais dans un jeu).
+  const [showSettings, setShowSettings] = useState(true);
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-6 px-4 py-6 md:px-8 md:py-10">

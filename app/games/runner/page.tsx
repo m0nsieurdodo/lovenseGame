@@ -12,7 +12,7 @@ export default function RunnerPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<RunnerEngine | null>(null);
 
-  const [stats, setStats] = useState<Stats>({ distance: 0 });
+  const [stats, setStats] = useState<Stats>({ distance: 0, lives: 3, power: 12 });
   const [overlay, setOverlay] = useState<Overlay>({
     show: true,
     title: "PRÊT ?",
@@ -66,6 +66,8 @@ export default function RunnerPage() {
     <GameShell title="Endless Runner × Lovense" onTabChange={onTabChange} settingsExtra={<VibeMap />}>
       <div className="flex flex-none items-stretch gap-2">
         <Stat k="DISTANCE" v={`${stats.distance}m`} />
+        <Stat k="VIES" v={"❤️".repeat(stats.lives) || "—"} />
+        <Stat k="PUISSANCE" v={`${stats.power}%`} />
         <button
           onClick={() => engineRef.current?.togglePause()}
           className="w-11 flex-none rounded-[10px] border border-line bg-[#0d0b20] text-lg text-ink active:border-cyan"
@@ -119,13 +121,15 @@ function VibeMap() {
     <Card>
       <CardTitle>Intensités — Endless Runner</CardTitle>
       <div className="text-[11px] leading-[1.9] text-muted">
-        <b className="text-ink">0-500m</b> → 10% · <b className="text-ink">500-2000m</b> → 30%
+        <b className="text-ink">3 vies</b> — le fond vibratoire suit la puissance
         <br />
-        <b className="text-ink">2000-5000m</b> → 60% · <b className="text-ink">5000m+</b> → 100%
+        <b className="text-ink">Obstacle esquivé</b> → puissance +6% (max 100%)
         <br />
-        <b className="text-ink">Saut réussi</b> → 10%
+        <b className="text-ink">Touché</b> → -1 vie, puissance -35%, forte vibration
         <br />
-        <b className="text-ink">Collision</b> → forte puis stop
+        <b className="text-ink">Ambiance</b> → pattern aléatoire (stable / double-tap / montée)
+        <br />
+        <b className="text-ink">Plus de vies</b> → gros hit puis stop
       </div>
     </Card>
   );
