@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+/* ============================================================
+   DESIGN SYSTEM — Arcade néon (source : prompt/design.md)
+   Palette obligatoire, glow system, glassmorphism.
+   ============================================================ */
+@theme {
+  /* Fond */
+  --color-bg: #0b0f1a;
+  --color-bg-deep: #060912;
+  --color-panel: #12102133;
+
+  /* Couleurs principales (max 2 par écran) */
+  --color-cyan: #00e5ff;
+  --color-violet: #8a2be2;
+
+  /* Secondaires */
+  --color-rose: #ff3df2;
+  --color-success: #00ff85;
+  --color-danger: #ff3b3b;
+
+  /* Texte */
+  --color-ink: #e8e6ff;
+  --color-muted: #8f8bb8;
+
+  /* Traits / bordures */
+  --color-line: #241f45;
+  --color-line-soft: #2b2750;
+
+  /* Rayons */
+  --radius-card: 16px;
+  --radius-pill: 999px;
+
+  /* Typo */
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background:
+    radial-gradient(1200px 800px at 50% -10%, #1a1440 0%, transparent 60%),
+    radial-gradient(900px 700px at 110% 120%, #2a0a3a 0%, transparent 55%),
+    var(--color-bg);
+  background-attachment: fixed;
+}
+
+/* ---------- Glow system (low / medium / high) ---------- */
+@utility glow-low {
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-cyan) 25%, transparent);
+}
+@utility glow-mid {
+  box-shadow: 0 0 22px color-mix(in srgb, var(--color-violet) 45%, transparent);
+}
+@utility glow-high {
+  box-shadow:
+    0 0 36px color-mix(in srgb, var(--color-rose) 60%, transparent),
+    0 0 8px color-mix(in srgb, var(--color-rose) 80%, transparent);
+}
+
+/* ---------- Glassmorphism léger ---------- */
+@utility glass {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line-soft);
+  backdrop-filter: blur(8px);
+}
+
+/* Texte dégradé néon (titres / logo) */
+@utility text-neon {
+  background: linear-gradient(90deg, var(--color-cyan), var(--color-rose));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Réduction des animations si l'utilisateur le demande */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Barres de scroll discrètes */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-soft);
+  border-radius: 999px;
+}
