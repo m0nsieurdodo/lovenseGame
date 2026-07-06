@@ -5,6 +5,7 @@
    ============================================================ */
 import { Lovense } from "./lovense";
 import { saveBestScore } from "./settings";
+import type { Overlay } from "./engine-types";
 
 const COLS = 10;
 const ROWS = 20;
@@ -26,7 +27,7 @@ const PIECES: Record<string, number[][]> = {
 const TYPES = Object.keys(PIECES);
 
 export interface Stats { score: number; lines: number; level: number }
-export interface Overlay { show: boolean; title: string; sub: string; btn: string }
+export type { Overlay };
 
 export interface EngineHooks {
   onStats: (s: Stats) => void;

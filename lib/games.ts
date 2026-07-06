@@ -11,12 +11,12 @@ export interface GameMeta {
 
 export const GAMES: GameMeta[] = [
   { id: "tetris", name: "Tetris", tagline: "Empile, casse, monte en intensité", icon: "▚", accent: "cyan", href: "/games/tetris", ready: true },
-  { id: "pong", name: "Pong", tagline: "Duel de raquettes néon", icon: "◗", accent: "violet", href: "/games/pong", ready: false },
-  { id: "runner", name: "Endless Runner", tagline: "Cours, saute, ne t'arrête pas", icon: "⛰", accent: "cyan", href: "/games/runner", ready: false },
-  { id: "aim", name: "Aim Trainer", tagline: "Vise, enchaîne les combos", icon: "◎", accent: "rose", href: "/games/aim", ready: false },
-  { id: "snake", name: "Snake", tagline: "Grandis sans te mordre", icon: "⌇", accent: "success", href: "/games/snake", ready: false },
-  { id: "casino", name: "Mini Casino", tagline: "Tire le levier, tente le jackpot", icon: "🎰", accent: "violet", href: "/games/casino", ready: false },
-  { id: "breakout", name: "Breakout", tagline: "Brise le mur, monte le combo", icon: "▦", accent: "rose", href: "/games/breakout", ready: false },
+  { id: "pong", name: "Pong", tagline: "Duel de raquettes néon", icon: "◗", accent: "violet", href: "/games/pong", ready: true },
+  { id: "runner", name: "Endless Runner", tagline: "Cours, saute, ne t'arrête pas", icon: "⛰", accent: "cyan", href: "/games/runner", ready: true },
+  { id: "aim", name: "Aim Trainer", tagline: "Vise, enchaîne les combos", icon: "◎", accent: "rose", href: "/games/aim", ready: true },
+  { id: "snake", name: "Snake", tagline: "Grandis sans te mordre", icon: "⌇", accent: "success", href: "/games/snake", ready: true },
+  { id: "casino", name: "Mini Casino", tagline: "Tire le levier, tente le jackpot", icon: "🎰", accent: "violet", href: "/games/casino", ready: true },
+  { id: "breakout", name: "Breakout", tagline: "Brise le mur, monte le combo", icon: "▦", accent: "rose", href: "/games/breakout", ready: true },
 ];
 
 export function getGame(id: string): GameMeta | undefined {
