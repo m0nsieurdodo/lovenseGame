@@ -1,18 +1,18 @@
 /* ============================================================
    ENDLESS RUNNER ENGINE — canvas + requestAnimationFrame.
-   Mapping vibration (prompt/jeu2.md) :
-     0-500        → 10% (ambiance)
-     500-2000     → 30%
-     2000-5000    → 60%
-     5000+        → 100%
-     saut réussi  → 10%
-     collision    → forte vibration puis stop
+   3 vies. La puissance (0-100) monte à chaque obstacle esquivé et
+   redescend d'un cran à chaque vie perdue. Le fond vibratoire alterne
+   aléatoirement entre plusieurs patterns (stable / double-tap / montée)
+   pour ne pas être répétitif, avec une intensité pilotée par la puissance.
+     saut réussi   → pulse proportionnel à la puissance
+     vie perdue    → forte vibration puis la puissance chute
+     game over     → gros hit puis stop
    ============================================================ */
 import { Lovense } from "./lovense";
 import { saveBestScore } from "./settings";
 import type { Overlay } from "./engine-types";
 
-export interface Stats { distance: number }
+export interface Stats { distance: number; lives: number; power: number }
 
 export interface EngineHooks {
   onStats: (s: Stats) => void;
@@ -21,12 +21,24 @@ export interface EngineHooks {
 
 interface Obstacle { x: number; w: number; h: number; dodged: boolean }
 
-function tierPct(distance: number) {
-  if (distance < 500) return 10;
-  if (distance < 2000) return 30;
-  if (distance < 5000) return 60;
-  return 100;
-}
+const MAX_LIVES = 3;
+const POWER_PER_DODGE = 6;
+const POWER_LOSS_ON_HIT = 35;
+const AMBIENT_PATTERNS: Array<(power: number) => void> = [
+  // stable : un pulse simple à l'intensité courante
+  (power) => Lovense.pulse(power, 220),
+  // double-tap : deux impulsions rapprochées
+  (power) => {
+    Lovense.pulse(power * 0.7, 100);
+    setTimeout(() => Lovense.pulse(power, 140), 140);
+  },
+  // montée : rampe en trois paliers
+  (power) => {
+    Lovense.pulse(power * 0.45, 90);
+    setTimeout(() => Lovense.pulse(power * 0.75, 90), 100);
+    setTimeout(() => Lovense.pulse(power, 160), 200);
+  },
+];
 
 export class RunnerEngine {
   private ctx: CanvasRenderingContext2D;
@@ -46,6 +58,9 @@ export class RunnerEngine {
   private nextSpawnAt = 0;
   private speed = 4;
   private distance = 0;
+  private lives = MAX_LIVES;
+  private power = 12; // 0-100, ambiance de départ légère
+  private invulnUntil = 0; // horodatage (ms jeu) de fin d'invulnérabilité après une touche
 
   private running = false;
   private paused = false;
@@ -91,10 +106,11 @@ export class RunnerEngine {
     this.speed = 4 + Math.min(6, this.distance / 700);
     this.refresh();
 
-    // ambiance par palier, une fois par seconde
+    // ambiance : pattern aléatoire, une fois par seconde, intensité = puissance
     if (t - this.lastAmbientAt > 1000) {
       this.lastAmbientAt = t;
-      Lovense.pulse(tierPct(this.distance), 200);
+      const pattern = AMBIENT_PATTERNS[(Math.random() * AMBIENT_PATTERNS.length) | 0];
+      pattern(this.power);
     }
 
     // spawn obstacles
@@ -112,17 +128,19 @@ export class RunnerEngine {
       const ox1 = o.x, ox2 = o.x + o.w;
       const oy1 = this.groundY - o.h, oy2 = this.groundY;
       const overlap = px2 > ox1 && px1 < ox2 && py2 > oy1 && py1 < oy2;
-      if (overlap) { this.gameOver(); return; }
+      if (overlap && t >= this.invulnUntil) { this.onHit(t); return; }
       if (!o.dodged && ox2 < px1) {
         o.dodged = true;
-        Lovense.pulse(10, 150); // saut réussi
+        this.power = Math.min(100, this.power + POWER_PER_DODGE);
+        Lovense.pulse(Math.max(8, this.power * 0.4), 150); // saut réussi
+        this.refresh();
       }
     }
     this.obstacles = this.obstacles.filter((o) => o.x + o.w > -10);
   }
 
   private refresh() {
-    this.hooks.onStats({ distance: Math.floor(this.distance) });
+    this.hooks.onStats({ distance: Math.floor(this.distance), lives: this.lives, power: Math.round(this.power) });
   }
 
   /* ---------- rendu ---------- */
@@ -170,12 +188,15 @@ export class RunnerEngine {
     }
     c.shadowBlur = 0;
 
-    // joueur
-    c.fillStyle = "#00e5ff";
-    c.shadowColor = "#00e5ff";
-    c.shadowBlur = 14;
-    this.roundRect(this.playerX, this.playerY, this.playerSize, this.playerSize, 7);
-    c.fill();
+    // joueur — clignote pendant l'invulnérabilité
+    const blinking = performance.now() < this.invulnUntil && Math.floor(performance.now() / 100) % 2 === 0;
+    if (!blinking) {
+      c.fillStyle = "#00e5ff";
+      c.shadowColor = "#00e5ff";
+      c.shadowBlur = 14;
+      this.roundRect(this.playerX, this.playerY, this.playerSize, this.playerSize, 7);
+      c.fill();
+    }
     c.shadowBlur = 0;
   }
 
@@ -206,6 +227,9 @@ export class RunnerEngine {
     this.playerY = this.groundY - this.playerSize;
     this.velY = 0;
     this.onGround = true;
+    this.lives = MAX_LIVES;
+    this.power = 12;
+    this.invulnUntil = 0;
     this.over = false;
     this.paused = false;
     this.lastAmbientAt = 0;
@@ -213,10 +237,23 @@ export class RunnerEngine {
     this.running = true;
     this.hooks.onOverlay({ show: false, title: "", sub: "", btn: "" });
   }
+  private onHit(t: number) {
+    this.lives--;
+    this.power = Math.max(0, this.power - POWER_LOSS_ON_HIT);
+    Lovense.pulse(90, 450); // forte vibration
+    this.refresh();
+    if (this.lives <= 0) {
+      this.gameOver();
+      return;
+    }
+    // vie perdue mais partie continue : on nettoie les obstacles proches + invulnérabilité brève
+    this.obstacles = this.obstacles.filter((o) => o.x > this.playerX + this.playerSize + 60);
+    this.invulnUntil = t + 1200;
+  }
   private gameOver() {
     this.over = true;
     this.running = false;
-    Lovense.pulse(90, 500); // forte vibration puis stop (retombe naturellement)
+    Lovense.pulse(100, 600); // gros hit puis stop (retombe naturellement)
     const score = Math.floor(this.distance);
     const best = saveBestScore("runner", score);
     this.hooks.onOverlay({

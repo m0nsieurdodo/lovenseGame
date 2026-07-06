@@ -64,7 +64,7 @@ export function GameShell({
         <section
           className={`w-full flex-1 overflow-y-auto pr-0.5 ${tab === "settings" ? "block" : "hidden"}`}
         >
-          <SettingsPanel />
+          <SettingsPanel showConnection={false} />
           {settingsExtra && <div className="mt-3">{settingsExtra}</div>}
         </section>
       </main>
