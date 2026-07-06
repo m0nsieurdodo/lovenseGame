@@ -2,7 +2,9 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>TETRIS × Lovense</title>
 <style>
   :root{
@@ -27,57 +29,124 @@
     color:var(--text);
     font-family:"Segoe UI",system-ui,sans-serif;
     display:flex;align-items:center;justify-content:center;
-    padding:16px;min-height:100%;
+    min-height:100%;
+    overflow:hidden;
     -webkit-user-select:none;user-select:none;
+    -webkit-touch-callout:none;
+    touch-action:none;
   }
-  .wrap{
-    display:grid;grid-template-columns:auto 260px;gap:18px;align-items:start;
+
+  /* ---------- Shell : une "app" plein écran, format téléphone ---------- */
+  .app{
+    width:min(100%,460px);
+    height:100dvh;
+    display:flex;flex-direction:column;
+    padding:calc(env(safe-area-inset-top) + 8px) 12px calc(env(safe-area-inset-bottom) + 10px);
+    gap:10px;
   }
+  header{display:flex;flex-direction:column;gap:8px;flex:none}
+  .titlebar{display:flex;align-items:center;justify-content:space-between;gap:10px}
   h1{
-    font-size:22px;letter-spacing:3px;margin:0 0 10px;
+    font-size:18px;letter-spacing:2px;margin:0;
     background:linear-gradient(90deg,var(--neon),var(--neon2));
     -webkit-background-clip:text;background-clip:text;color:transparent;
-    text-transform:uppercase;font-weight:800;
+    text-transform:uppercase;font-weight:800;white-space:nowrap;
   }
-  .stage{position:relative}
-  canvas{
+  .miniconn{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+
+  /* ---------- Onglets ---------- */
+  .tabs{
+    display:grid;grid-template-columns:1fr 1fr;gap:6px;
+    background:#0d0b20;border:1px solid #241f45;border-radius:12px;padding:4px;
+  }
+  .tab{
+    appearance:none;cursor:pointer;border:none;border-radius:9px;
+    background:transparent;color:var(--muted);
+    padding:9px 0;font-size:13px;font-weight:700;letter-spacing:.5px;
+    transition:.15s;
+  }
+  .tab.active{
+    background:linear-gradient(90deg,#1c1840,#2a1550);
+    color:var(--text);box-shadow:0 0 14px #00e5ff22;
+  }
+
+  /* ---------- Panneaux ---------- */
+  main{flex:1;min-height:0;display:flex}
+  .panel{display:none;flex:1;min-height:0;width:100%}
+  .panel.active{display:flex;flex-direction:column;min-height:0}
+
+  /* --- Panneau JEU --- */
+  .game-panel{gap:10px}
+  .hud{
+    display:flex;align-items:stretch;gap:8px;flex:none;
+  }
+  .stat{
+    flex:1;background:#0d0b20;border:1px solid #241f45;border-radius:10px;
+    padding:6px 8px;display:flex;flex-direction:column;justify-content:center;
+  }
+  .stat .k{font-size:9px;color:var(--muted);letter-spacing:1px}
+  .stat .v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+  .nextbox{
+    background:#0d0b20;border:1px solid #241f45;border-radius:10px;
+    padding:6px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  }
+  .nextbox .k{font-size:9px;color:var(--muted);letter-spacing:1px}
+  #nextCanvas{display:block}
+  .pausebtn{
+    background:#0d0b20;border:1px solid #241f45;border-radius:10px;color:var(--text);
+    width:44px;font-size:18px;cursor:pointer;flex:none;
+  }
+  .pausebtn:active{border-color:var(--neon)}
+
+  .vibewrap{flex:none}
+  .vibebar{height:6px;border-radius:4px;background:#0d0b20;overflow:hidden;border:1px solid #241f45}
+  .vibebar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--neon),var(--neon2));transition:width .1s}
+
+  .stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+  .board-wrap{position:relative;line-height:0}
+  canvas#board{
     background:linear-gradient(180deg,#0b0920,#0a0818);
     border:2px solid #2b2750;border-radius:14px;
     box-shadow:0 0 40px #00e5ff22, inset 0 0 60px #0006;
-    display:block;
+    display:block;touch-action:none;
   }
   .overlay{
     position:absolute;inset:0;display:none;align-items:center;justify-content:center;
-    flex-direction:column;gap:12px;text-align:center;
+    flex-direction:column;gap:12px;text-align:center;padding:16px;
     background:#05040ccc;border-radius:14px;backdrop-filter:blur(3px);
   }
   .overlay.show{display:flex}
-  .overlay h2{margin:0;font-size:26px;letter-spacing:2px}
+  .overlay h2{margin:0;font-size:24px;letter-spacing:2px}
+
+  /* --- Contrôles tactiles --- */
+  .touch{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .touch .btn{padding:16px 0;font-size:22px}
+  .touch .wide{grid-column:span 3;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+  /* --- Panneau RÉGLAGES --- */
+  .settings-panel{overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px}
+  .settings-panel.active{display:block}
+  .settings-panel .card{margin-bottom:12px}
+
+  /* ---------- Composants communs ---------- */
   .btn{
     cursor:pointer;border:1px solid #3a3670;border-radius:10px;
-    background:#1a1638;color:var(--text);padding:9px 14px;font-size:14px;
-    transition:.15s;font-weight:600;
+    background:#1a1638;color:var(--text);padding:11px 14px;font-size:14px;
+    transition:.15s;font-weight:600;touch-action:none;
   }
-  .btn:hover{border-color:var(--neon);box-shadow:0 0 14px #00e5ff55}
+  .btn:active{border-color:var(--neon);box-shadow:0 0 14px #00e5ff55}
   .btn.primary{background:linear-gradient(90deg,var(--neon),var(--neon2));color:#06040f;border:none}
   .btn.danger{background:#2a0e18;border-color:var(--err);color:var(--err)}
-  .btn.danger:hover{box-shadow:0 0 14px #ff547066}
-  .side{display:flex;flex-direction:column;gap:14px}
   .card{
     background:var(--panel);border:1px solid #2b2750;border-radius:12px;
     padding:12px;backdrop-filter:blur(6px);
   }
   .card h3{margin:0 0 8px;font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
-  .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .stat{background:#0d0b20;border:1px solid #241f45;border-radius:8px;padding:8px 10px}
-  .stat .k{font-size:10px;color:var(--muted);letter-spacing:1px}
-  .stat .v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
-  #nextCanvas{display:block;margin:0 auto;background:#0d0b20;border-radius:8px;border:1px solid #241f45}
   .row{display:flex;gap:8px;align-items:center}
   label{font-size:12px;color:var(--muted)}
   input,select{
     background:#0d0b20;border:1px solid #2b2750;color:var(--text);
-    border-radius:8px;padding:7px 9px;font-size:13px;width:100%;
+    border-radius:8px;padding:9px 10px;font-size:16px;width:100%;
   }
   input[type=range]{accent-color:var(--neon2);padding:0}
   input[type=checkbox]{width:auto;accent-color:var(--neon2)}
@@ -88,107 +157,113 @@
   .dot.err{background:var(--err);color:var(--err)}
   .vibemap{font-size:11px;color:var(--muted);line-height:1.8}
   .vibemap b{color:var(--text)}
-  .vibebar{height:6px;border-radius:4px;background:#0d0b20;overflow:hidden;margin-top:8px;border:1px solid #241f45}
-  .vibebar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--neon),var(--neon2));transition:width .1s}
   .help{font-size:11px;color:var(--muted);line-height:1.7}
   kbd{background:#1a1638;border:1px solid #3a3670;border-radius:4px;padding:1px 5px;font-size:10px}
-  .touch{display:none;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
-  .touch .btn{padding:14px 0;font-size:18px}
-  @media (max-width:720px){
-    .wrap{grid-template-columns:1fr}
-    .side{order:2}
-    .touch{display:grid}
-  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div>
-    <h1>Tetris × Lovense</h1>
-    <div class="stage">
-      <canvas id="board" width="300" height="600"></canvas>
-      <div class="overlay show" id="overlay">
-        <h2 id="ovTitle">PRÊT ?</h2>
-        <div id="ovSub" class="help" style="max-width:220px">Connecte ton Lovense à droite, puis lance la partie.</div>
-        <button class="btn primary" id="startBtn">▶ Jouer</button>
-      </div>
+<div class="app">
+  <header>
+    <div class="titlebar">
+      <h1>Tetris × Lovense</h1>
+      <div class="miniconn"><span class="dot" id="dotMini"></span><span id="miniTxt">Hors ligne</span></div>
     </div>
-    <div class="touch">
-      <button class="btn" data-act="left">◀</button>
-      <button class="btn" data-act="rotate">⟳</button>
-      <button class="btn" data-act="right">▶</button>
-      <button class="btn" data-act="drop">⤓</button>
+    <div class="tabs">
+      <button class="tab active" data-tab="game">🎮 Jeu</button>
+      <button class="tab" data-tab="settings">⚙️ Réglages</button>
     </div>
-  </div>
+  </header>
 
-  <div class="side">
-    <div class="card">
-      <div class="stats">
-        <div class="stat"><div class="k">SCORE</div><div class="v" id="score">0</div></div>
-        <div class="stat"><div class="k">LIGNES</div><div class="v" id="lines">0</div></div>
-        <div class="stat"><div class="k">NIVEAU</div><div class="v" id="level">1</div></div>
-        <div class="stat"><div class="k">TÉTRIS ×</div><div class="v" id="combo">0</div></div>
+  <main>
+    <!-- ======================= PANNEAU JEU ======================= -->
+    <section class="panel game-panel active" id="panel-game">
+      <div class="hud">
+        <div class="stat"><span class="k">SCORE</span><span class="v" id="score">0</span></div>
+        <div class="stat"><span class="k">LIGNES</span><span class="v" id="lines">0</span></div>
+        <div class="stat"><span class="k">NIVEAU</span><span class="v" id="level">1</span></div>
+        <div class="nextbox"><span class="k">SUIVANT</span><canvas id="nextCanvas"></canvas></div>
+        <button class="pausebtn" id="pauseBtn" title="Pause">⏸</button>
       </div>
-    </div>
 
-    <div class="card">
-      <h3>Suivant</h3>
-      <canvas id="nextCanvas" width="120" height="90"></canvas>
-    </div>
+      <div class="vibewrap"><div class="vibebar"><i id="vibebar"></i></div></div>
 
-    <div class="card">
-      <h3>Lovense — Game Mode</h3>
-      <div class="field">
-        <label>IP locale</label>
-        <input id="ip" value="192.168.1.28">
+      <div class="stage">
+        <div class="board-wrap">
+          <canvas id="board" width="300" height="600"></canvas>
+          <div class="overlay show" id="overlay">
+            <h2 id="ovTitle">PRÊT ?</h2>
+            <div id="ovSub" class="help" style="max-width:240px">Ouvre l'onglet <b>Réglages</b> pour connecter ton Lovense, puis lance la partie.</div>
+            <button class="btn primary" id="startBtn">▶ Jouer</button>
+          </div>
+        </div>
       </div>
-      <div class="field">
-        <label>Transport</label>
-        <select id="transport">
-          <option value="https">HTTPS · lovense.club:30010</option>
-          <option value="http">HTTP direct · :20010</option>
-        </select>
-      </div>
-      <div class="row" style="margin-bottom:8px">
-        <button class="btn primary" id="connectBtn" style="flex:1">Connecter</button>
-        <button class="btn" id="testBtn">Test</button>
-      </div>
-      <button class="btn danger" id="stopBtn" style="width:100%">■ STOP d'urgence</button>
-      <div class="status" style="margin-top:10px"><span class="dot" id="dot"></span><span id="statusTxt">Non connecté</span></div>
-      <div class="vibebar"><i id="vibebar"></i></div>
-    </div>
 
-    <div class="card">
-      <h3>Calibrage</h3>
-      <div class="field">
-        <label>Intensité max · <span id="maxLbl">100%</span></label>
-        <input id="maxRange" type="range" min="0" max="100" value="100">
+      <div class="touch">
+        <button class="btn" data-act="left">◀</button>
+        <button class="btn" data-act="rotate">⟳</button>
+        <button class="btn" data-act="right">▶</button>
+        <div class="wide">
+          <button class="btn" data-act="softdrop">↓ Doux</button>
+          <button class="btn" data-act="drop">⤓ Hard</button>
+        </div>
       </div>
-      <label class="row" style="cursor:pointer;gap:8px">
-        <input id="warmup" type="checkbox">
-        <span style="font-size:12px;color:var(--text)">Warm-up — fond léger qui monte avec le niveau</span>
-      </label>
-    </div>
+    </section>
 
-    <div class="card">
-      <h3>Intensités</h3>
-      <div class="vibemap">
-        <b>Pose de pièce</b> → 10%<br>
-        <b>1 ligne</b> → 20% · <b>2</b> → 30%<br>
-        <b>3 lignes</b> → 40% · <b>4 (Tétris)</b> → 70%<br>
-        <b>Tétris à la suite</b> → 100% 🔥
+    <!-- ======================= PANNEAU RÉGLAGES ======================= -->
+    <section class="panel settings-panel" id="panel-settings">
+      <div class="card">
+        <h3>Lovense — Game Mode</h3>
+        <div class="field">
+          <label>IP locale</label>
+          <input id="ip" value="192.168.1.28" inputmode="decimal">
+        </div>
+        <div class="field">
+          <label>Transport</label>
+          <select id="transport">
+            <option value="https">HTTPS · lovense.club:30010</option>
+            <option value="http">HTTP direct · :20010</option>
+          </select>
+        </div>
+        <div class="row" style="margin-bottom:8px">
+          <button class="btn primary" id="connectBtn" style="flex:1">Connecter</button>
+          <button class="btn" id="testBtn">Test</button>
+        </div>
+        <button class="btn danger" id="stopBtn" style="width:100%">■ STOP d'urgence</button>
+        <div class="status" style="margin-top:10px"><span class="dot" id="dot"></span><span id="statusTxt">Non connecté</span></div>
       </div>
-    </div>
 
-    <div class="card">
-      <h3>Commandes</h3>
-      <div class="help">
-        <kbd>←</kbd> <kbd>→</kbd> déplacer · <kbd>↓</kbd> soft drop<br>
-        <kbd>↑</kbd>/<kbd>X</kbd> rotation · <kbd>Espace</kbd> hard drop<br>
-        <kbd>P</kbd> pause
+      <div class="card">
+        <h3>Calibrage</h3>
+        <div class="field">
+          <label>Intensité max · <span id="maxLbl">100%</span></label>
+          <input id="maxRange" type="range" min="0" max="100" value="100">
+        </div>
+        <label class="row" style="cursor:pointer;gap:8px">
+          <input id="warmup" type="checkbox">
+          <span style="font-size:12px;color:var(--text)">Warm-up — fond léger qui monte avec le niveau</span>
+        </label>
       </div>
-    </div>
-  </div>
+
+      <div class="card">
+        <h3>Intensités</h3>
+        <div class="vibemap">
+          <b>Pose de pièce</b> → 10%<br>
+          <b>1 ligne</b> → 20% · <b>2</b> → 30%<br>
+          <b>3 lignes</b> → 40% · <b>4 (Tétris)</b> → 70%<br>
+          <b>Tétris à la suite</b> → 100% 🔥
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Commandes</h3>
+        <div class="help">
+          Sur mobile : boutons tactiles sous le plateau.<br>
+          Au clavier : <kbd>←</kbd> <kbd>→</kbd> déplacer · <kbd>↓</kbd> soft drop<br>
+          <kbd>↑</kbd>/<kbd>X</kbd> rotation · <kbd>Espace</kbd> hard drop · <kbd>P</kbd> pause
+        </div>
+      </div>
+    </section>
+  </main>
 </div>
 
 <script>
@@ -296,11 +371,13 @@ const Lovense = (() => {
    ============================================================ */
 const UI = {
   el:id=>document.getElementById(id),
-  set(id,v){ this.el(id).textContent = v; },
   status(state, txt){
-    const dot = UI.el("dot");
-    dot.className = "dot" + (state==="ok"?" ok":state==="err"?" err":"");
+    ["dot","dotMini"].forEach(id=>{
+      const dot = UI.el(id);
+      dot.className = "dot" + (state==="ok"?" ok":state==="err"?" err":"");
+    });
     UI.el("statusTxt").textContent = txt;
+    UI.el("miniTxt").textContent = state==="ok" ? "Connecté" : state==="err" ? "Erreur" : txt;
   },
   vibeBar(pct){ UI.el("vibebar").style.width = pct + "%"; }
 };
@@ -308,11 +385,13 @@ const UI = {
 /* ============================================================
    TETRIS
    ============================================================ */
-const COLS = 10, ROWS = 20, CELL = 30;
+const COLS = 10, ROWS = 20;
+let CELL = 30;                         // taille recalculée par fitBoard()
 const board = document.getElementById("board");
 const ctx = board.getContext("2d");
 const nextCv = document.getElementById("nextCanvas");
 const nctx = nextCv.getContext("2d");
+const NEXT_W = 60, NEXT_H = 42;
 
 const COLORS = {
   I:"#00e5ff", O:"#ffd23f", T:"#c56bff", S:"#2fffb0",
@@ -332,7 +411,8 @@ const TYPES = Object.keys(PIECES);
 
 let grid, cur, nextType, bag = [];
 let score, lines, level, comboTetris;
-let dropTimer, dropInterval, running, paused, over;
+let dropTimer, dropInterval, running, paused, over, clearing;
+let clearRows = null, clearK = 0;      // état de l'animation de disparition des lignes
 
 function newBag(){
   const t = [...TYPES];
@@ -368,17 +448,21 @@ function collide(shape, px, py){
   }
   return false;
 }
-function move(dx){ if(!collide(cur.shape, cur.x+dx, cur.y)){ cur.x+=dx; draw(); } }
+function canPlay(){ return running && !paused && !over && !clearing; }
+function move(dx){ if(!canPlay()) return; if(!collide(cur.shape, cur.x+dx, cur.y)){ cur.x+=dx; draw(); } }
 function softDrop(){
+  if(!canPlay()) return;
   if(!collide(cur.shape, cur.x, cur.y+1)){ cur.y++; score+=1; draw(); refresh(); }
   else lock();
 }
 function hardDrop(){
+  if(!canPlay()) return;
   let d=0;
   while(!collide(cur.shape, cur.x, cur.y+1)){ cur.y++; d++; }
   score += d*2; draw(); lock();
 }
 function tryRotate(){
+  if(!canPlay()) return;
   const r = rotate(cur.shape);
   for(const k of [0,-1,1,-2,2]){
     if(!collide(r, cur.x+k, cur.y)){ cur.shape=r; cur.x+=k; draw(); return; }
@@ -393,20 +477,33 @@ function lock(){
     }
   }
   Lovense.pulse(10, 130);         // 🔔 pose de pièce → 10%
-  clearLines();
-  spawn(); draw();
-}
-function clearLines(){
-  let cleared = 0;
-  for(let y=ROWS-1;y>=0;y--){
-    if(grid[y].every(c=>c)){
-      grid.splice(y,1);
-      grid.unshift(Array(COLS).fill(0));
-      cleared++; y++;
-    }
-  }
-  if(cleared===0){ return; }
 
+  // lignes pleines ?
+  const full = [];
+  for(let y=0;y<ROWS;y++) if(grid[y].every(c=>c)) full.push(y);
+
+  if(full.length){
+    cur = null;
+    clearing = true;
+    clearInterval(dropTimer);
+    animateClear(full, () => {
+      removeRows(full);
+      resolveClear(full.length);
+      clearing = false;
+      spawn(); draw();
+      if(running && !paused && !over){ clearInterval(dropTimer); dropTimer = setInterval(tick, dropInterval); }
+    });
+  } else {
+    spawn(); draw();
+  }
+}
+function removeRows(rows){
+  const set = new Set(rows);
+  const kept = grid.filter((_,y)=>!set.has(y));
+  while(kept.length < ROWS) kept.unshift(Array(COLS).fill(0));
+  grid = kept;
+}
+function resolveClear(cleared){
   lines += cleared;
   score += [0,100,300,500,800][cleared] * level;
 
@@ -429,12 +526,13 @@ function clearLines(){
 }
 function setSpeed(){
   dropInterval = Math.max(90, 800 - (level-1)*70);
-  if(running && !paused){ clearInterval(dropTimer); dropTimer = setInterval(tick, dropInterval); }
+  if(running && !paused && !clearing){ clearInterval(dropTimer); dropTimer = setInterval(tick, dropInterval); }
 }
 function tick(){ if(!collide(cur.shape, cur.x, cur.y+1)){ cur.y++; draw(); } else lock(); }
 
 /* ---------- rendu ---------- */
 function roundRect(c,x,y,w,h,r){
+  r = Math.min(r, w/2, h/2);
   c.beginPath();
   c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
   c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
@@ -446,15 +544,45 @@ function cell(c, x, y, color, size=CELL){
   c.fillStyle = "#ffffff22";
   roundRect(c, px+p, py+p, size-2*p, (size-2*p)*0.4, 6); c.fill();
 }
+// cellule en cours de disparition : flash blanc + implosion vers le centre
+function cellClearing(x, y, color, k){
+  const size=CELL, p=2, px=x*size, py=y*size;
+  const s = 1 - k;                          // 1 → 0
+  const cx=px+size/2, cy=py+size/2;
+  const w=(size-2*p)*s, h=(size-2*p)*s;
+  if(w<=0.5||h<=0.5) return;
+  ctx.save();
+  ctx.shadowColor="#ffffff"; ctx.shadowBlur=18*(1-k);
+  ctx.globalAlpha=1;
+  ctx.fillStyle=color;
+  roundRect(ctx, cx-w/2, cy-h/2, w, h, 6*s); ctx.fill();
+  ctx.globalAlpha=Math.max(0, 1-k);         // voile blanc qui s'estompe
+  ctx.fillStyle="#ffffff";
+  roundRect(ctx, cx-w/2, cy-h/2, w, h, 6*s); ctx.fill();
+  ctx.restore();
+}
 function draw(){
-  ctx.clearRect(0,0,board.width,board.height);
+  ctx.clearRect(0,0,COLS*CELL,ROWS*CELL);
   // grille
-  ctx.strokeStyle = "#ffffff08";
+  ctx.strokeStyle = "#ffffff08"; ctx.lineWidth = 1;
   for(let x=0;x<=COLS;x++){ ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,ROWS*CELL); ctx.stroke(); }
   for(let y=0;y<=ROWS;y++){ ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(COLS*CELL,y*CELL); ctx.stroke(); }
+
+  // bandeau lumineux sur les lignes qui disparaissent
+  if(clearRows){
+    const a = Math.max(0, 1-clearK)*0.5;
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    clearRows.forEach(ry => ctx.fillRect(0, ry*CELL, COLS*CELL, CELL));
+  }
+
   // pile
-  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) if(grid[y][x]) cell(ctx,x,y,COLORS[grid[y][x]]);
-  if(!cur) return;
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+    if(!grid[y][x]) continue;
+    if(clearRows && clearRows.includes(y)) cellClearing(x, y, COLORS[grid[y][x]], clearK);
+    else cell(ctx, x, y, COLORS[grid[y][x]]);
+  }
+
+  if(!cur || clearRows) return;
   // ghost
   let gy=cur.y; while(!collide(cur.shape, cur.x, gy+1)) gy++;
   ctx.globalAlpha=.18;
@@ -465,61 +593,111 @@ function draw(){
   for(let y=0;y<cur.shape.length;y++) for(let x=0;x<cur.shape[y].length;x++)
     if(cur.shape[y][x] && cur.y+y>=0) cell(ctx, cur.x+x, cur.y+y, COLORS[cur.type]);
 }
+function animateClear(rows, done){
+  clearRows = rows.slice(); clearK = 0;
+  const dur = 300, start = performance.now();
+  function frame(now){
+    clearK = Math.min(1, (now-start)/dur);
+    draw();
+    if(clearK < 1) requestAnimationFrame(frame);
+    else { clearRows = null; clearK = 0; done(); }
+  }
+  requestAnimationFrame(frame);
+}
 function drawNext(){
-  nctx.clearRect(0,0,nextCv.width,nextCv.height);
-  const s = PIECES[nextType], size=22;
-  const w=s[0].length*size, h=s.length*size;
-  const ox=(nextCv.width-w)/2, oy=(nextCv.height-h)/2;
-  for(let y=0;y<s.length;y++) for(let x=0;x<s[y].length;x++) if(s[y][x]){
+  nctx.clearRect(0,0,NEXT_W,NEXT_H);
+  if(!nextType) return;
+  const s = PIECES[nextType], cols=s[0].length, rows=s.length;
+  const size = Math.min((NEXT_W-6)/cols, (NEXT_H-6)/rows, 14);
+  const w=cols*size, h=rows*size, ox=(NEXT_W-w)/2, oy=(NEXT_H-h)/2;
+  for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) if(s[y][x]){
     nctx.fillStyle = COLORS[nextType];
-    roundRect(nctx, ox+x*size+2, oy+y*size+2, size-4, size-4, 5); nctx.fill();
+    roundRect(nctx, ox+x*size+1.5, oy+y*size+1.5, size-3, size-3, 4); nctx.fill();
   }
 }
 function refresh(){
   UI.el("score").textContent = score;
   UI.el("lines").textContent = lines;
   UI.el("level").textContent = level;
-  UI.el("combo").textContent = comboTetris;
+}
+
+/* ---------- dimensionnement responsive ---------- */
+function fitBoard(){
+  const stage = board.parentElement.parentElement;   // .stage
+  const availW = stage.clientWidth;
+  const availH = stage.clientHeight;
+  if(availW < 20 || availH < 20) return;
+  let cell = Math.floor(Math.min(availW / COLS, availH / ROWS));
+  cell = Math.max(8, cell);
+  CELL = cell;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = COLS*cell, h = ROWS*cell;
+  board.style.width = w+"px";  board.style.height = h+"px";
+  board.width = Math.round(w*dpr); board.height = Math.round(h*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+
+  const nDpr = dpr;
+  nextCv.style.width = NEXT_W+"px"; nextCv.style.height = NEXT_H+"px";
+  nextCv.width = Math.round(NEXT_W*nDpr); nextCv.height = Math.round(NEXT_H*nDpr);
+  nctx.setTransform(nDpr,0,0,nDpr,0,0);
+
+  draw();
+  if(nextType) drawNext();
 }
 
 /* ---------- flow ---------- */
 function reset(){
   grid = Array.from({length:ROWS},()=>Array(COLS).fill(0));
   score=0; lines=0; level=1; comboTetris=0; bag=[]; nextType=null;
-  dropInterval=800; over=false; paused=false;
+  dropInterval=800; over=false; paused=false; clearing=false; clearRows=null;
   refresh();
 }
 function startGame(){
-  reset(); spawn(); draw();
+  reset(); spawn(); fitBoard(); draw();
   running=true;
   Lovense.updateWarmup(1);
+  UI.el("startBtn").textContent = "▶ Jouer";
   UI.el("overlay").classList.remove("show");
   clearInterval(dropTimer); dropTimer=setInterval(tick, dropInterval);
 }
 function gameOver(){
-  over=true; running=false; clearInterval(dropTimer);
+  over=true; running=false; clearing=false; clearRows=null; clearInterval(dropTimer);
   Lovense.mute();
   UI.el("ovTitle").textContent = "GAME OVER";
-  UI.el("ovSub").textContent = `Score : ${score} · Lignes : ${lines}`;
+  UI.el("ovSub").innerHTML = `Score : <b>${score}</b> · Lignes : <b>${lines}</b>`;
   UI.el("startBtn").textContent = "↻ Rejouer";
   UI.el("overlay").classList.add("show");
 }
 function togglePause(){
-  if(!running) return;
+  if(!running || over) return;
   paused=!paused;
-  if(paused){ clearInterval(dropTimer); Lovense.mute();
-    UI.el("ovTitle").textContent="PAUSE"; UI.el("ovSub").textContent="Appuie sur P pour reprendre";
-    UI.el("startBtn").style.display="none"; UI.el("overlay").classList.add("show");
-  } else { UI.el("overlay").classList.remove("show"); UI.el("startBtn").style.display="";
-    Lovense.unmute(); dropTimer=setInterval(tick, dropInterval);
+  if(paused){
+    clearInterval(dropTimer); Lovense.mute();
+    UI.el("ovTitle").textContent="PAUSE";
+    UI.el("ovSub").textContent="Reprends quand tu veux.";
+    UI.el("startBtn").textContent="▶ Reprendre";
+    UI.el("overlay").classList.add("show");
+  } else {
+    UI.el("overlay").classList.remove("show");
+    Lovense.unmute();
+    if(!clearing){ clearInterval(dropTimer); dropTimer=setInterval(tick, dropInterval); }
   }
 }
 
-/* ---------- inputs ---------- */
+/* ---------- onglets ---------- */
+function activateTab(name){
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active", b.dataset.tab===name));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active", p.id==="panel-"+name));
+  if(name==="settings" && running && !paused && !over) togglePause();   // auto-pause en quittant le jeu
+  if(name==="game") requestAnimationFrame(fitBoard);
+}
+document.querySelectorAll(".tab").forEach(t=> t.addEventListener("click", ()=>activateTab(t.dataset.tab)));
+
+/* ---------- inputs clavier ---------- */
 document.addEventListener("keydown", e=>{
   if(["ArrowLeft","ArrowRight","ArrowDown","ArrowUp"," "].includes(e.key)) e.preventDefault();
   if(e.key==="p"||e.key==="P"){ togglePause(); return; }
-  if(!running||paused||over) return;
+  if(!canPlay()) return;
   switch(e.key){
     case "ArrowLeft": move(-1); break;
     case "ArrowRight": move(1); break;
@@ -528,17 +706,31 @@ document.addEventListener("keydown", e=>{
     case " ": hardDrop(); break;
   }
 });
-document.querySelectorAll(".touch .btn").forEach(b=>{
-  b.addEventListener("click", ()=>{
-    if(!running||paused||over) return;
-    const a=b.dataset.act;
-    if(a==="left") move(-1);
-    if(a==="right") move(1);
-    if(a==="rotate") tryRotate();
-    if(a==="drop") hardDrop();
-  });
+
+/* ---------- inputs tactiles (avec répétition au maintien) ---------- */
+const ACTIONS = { left:()=>move(-1), right:()=>move(1), softdrop:softDrop, rotate:tryRotate, drop:hardDrop };
+const REPEATABLE = { left:true, right:true, softdrop:true };
+document.querySelectorAll(".touch .btn").forEach(btn=>{
+  const act = btn.dataset.act, fn = ACTIONS[act];
+  let hold=null, rep=null;
+  const start = e=>{
+    e.preventDefault();
+    fn();
+    if(REPEATABLE[act]){
+      hold = setTimeout(()=>{ rep = setInterval(fn, 70); }, 200);
+    }
+  };
+  const end = ()=>{ clearTimeout(hold); clearInterval(rep); hold=rep=null; };
+  btn.addEventListener("pointerdown", start);
+  btn.addEventListener("pointerup", end);
+  btn.addEventListener("pointerleave", end);
+  btn.addEventListener("pointercancel", end);
+  btn.addEventListener("contextmenu", e=>e.preventDefault());
 });
-UI.el("startBtn").addEventListener("click", startGame);
+
+/* ---------- boutons overlay / pause ---------- */
+UI.el("startBtn").addEventListener("click", ()=>{ if(paused) togglePause(); else startGame(); });
+UI.el("pauseBtn").addEventListener("click", togglePause);
 
 /* ---------- Lovense UI ---------- */
 UI.el("connectBtn").addEventListener("click", async ()=>{
@@ -550,7 +742,7 @@ UI.el("connectBtn").addEventListener("click", async ()=>{
     if(r.ok){ UI.status("ok", r.names ? `Connecté · ${r.names}` : "Connecté"); }
     else { UI.status("err", "Réponse inattendue"); }
   }catch(err){
-    UI.status("err", "Échec — voir notes ci-dessous");
+    UI.status("err", "Échec — vérifie l'IP / le transport");
   }
 });
 UI.el("testBtn").addEventListener("click", ()=> Lovense.pulse(40, 700));
@@ -564,6 +756,12 @@ UI.el("warmup").addEventListener("change", e=>{
   Lovense.updateWarmup(level||1);
 });
 
+/* ---------- init ---------- */
+window.addEventListener("resize", fitBoard);
+window.addEventListener("orientationchange", ()=> setTimeout(fitBoard, 200));
+if(window.visualViewport) window.visualViewport.addEventListener("resize", fitBoard);
+reset();
+fitBoard();
 draw();
 </script>
 </body>
