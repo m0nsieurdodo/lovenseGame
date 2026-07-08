@@ -15,8 +15,9 @@ export const GAMES: GameMeta[] = [
   { id: "runner", name: "Endless Runner", tagline: "Cours, saute, ne t'arrête pas", icon: "⛰", accent: "cyan", href: "/games/runner", ready: true },
   { id: "aim", name: "Aim Trainer", tagline: "Vise, enchaîne les combos", icon: "◎", accent: "rose", href: "/games/aim", ready: true },
   { id: "snake", name: "Snake", tagline: "Grandis sans te mordre", icon: "⌇", accent: "success", href: "/games/snake", ready: true },
-  { id: "casino", name: "Mini Casino", tagline: "Tire le levier, tente le jackpot", icon: "🎰", accent: "violet", href: "/games/casino", ready: true },
+  { id: "casino", name: "Grand Saloon", tagline: "5 rouleaux, 3 jackpots, vibes surprises", icon: "🎰", accent: "violet", href: "/games/casino", ready: true },
   { id: "breakout", name: "Breakout", tagline: "Brise le mur, monte le combo", icon: "▦", accent: "rose", href: "/games/breakout", ready: true },
+  { id: "rhythm", name: "Boîte à Rythme", tagline: "16 pads, 16 sensations", icon: "🎛️", accent: "rose", href: "/games/rhythm", ready: true },
 ];
 
 export function getGame(id: string): GameMeta | undefined {
