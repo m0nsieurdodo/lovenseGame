@@ -14,9 +14,17 @@
 export type Transport = "https" | "http";
 export type VibeListener = (pct: number) => void;
 
+export interface ToyInfo {
+  id: string;
+  name: string; // ex. "solace", "gemini"
+  nickName?: string;
+  battery?: number;
+}
+
 export interface ConnectResult {
   ok: boolean;
   names?: string;
+  toys?: ToyInfo[];
   raw?: unknown;
 }
 
@@ -28,6 +36,8 @@ class LovenseController {
   private scale = 1; // intensité max (0..1)
   private warmup = false;
   private mock = true; // true tant qu'aucun toy réel n'est connecté
+  private toys: ToyInfo[] = [];
+  private active = new Set<string>(); // ids des toys qui reçoivent les commandes
   private listeners = new Set<VibeListener>();
 
   /* ---- abonnement UI (barre de vibration, feedback visuel) ---- */
@@ -68,16 +78,22 @@ class LovenseController {
       if (data && data.code === 200) {
         this.connected = true;
         this.mock = false;
-        let names = "";
+        this.toys = [];
         try {
-          const toys = JSON.parse(data.data.toys);
-          names = Object.values(toys)
-            .map((t: any) => t.name || t.id)
-            .join(", ");
+          const parsed = JSON.parse(data.data.toys);
+          this.toys = Object.entries(parsed).map(([id, t]: [string, any]) => ({
+            id: t.id || id,
+            name: t.name || id,
+            nickName: t.nickName || undefined,
+            battery: typeof t.battery === "number" ? t.battery : undefined,
+          }));
         } catch {
           /* noop */
         }
-        return { ok: true, names };
+        // Par défaut, tous les toys détectés reçoivent les commandes.
+        this.active = new Set(this.toys.map((t) => t.id));
+        const names = this.toys.map((t) => t.nickName || t.name).join(" + ");
+        return { ok: true, names, toys: this.toys };
       }
       this.connected = false;
       return { ok: false, raw: data };
@@ -85,6 +101,39 @@ class LovenseController {
       this.connected = false;
       return { ok: false, raw: err };
     }
+  }
+
+  getToys(): ToyInfo[] {
+    return this.toys;
+  }
+  isToyActive(id: string) {
+    return this.active.has(id);
+  }
+  /** Active/désactive un toy ; un toy désactivé est immédiatement stoppé. */
+  setToyActive(id: string, on: boolean) {
+    if (on) {
+      this.active.add(id);
+      if (!this.stopTimer) this.toBaseline();
+    } else {
+      this.active.delete(id);
+      if (!this.mock && this.connected) {
+        this.post({ command: "Function", action: "Stop", timeSec: 0, toy: id, apiVer: 1 }).catch(() => {});
+      }
+    }
+  }
+
+  /** Cibles des commandes : [""] = broadcast (tous), sinon un envoi par toy actif. */
+  private targets(): string[] {
+    if (this.toys.length === 0 || this.active.size === this.toys.length) return [""];
+    return this.toys.filter((t) => this.active.has(t.id)).map((t) => t.id);
+  }
+
+  private async sendFunction(action: string) {
+    const tg = this.targets();
+    if (tg.length === 0) return; // aucun toy actif → rien à envoyer
+    await Promise.all(
+      tg.map((toy) => this.post({ command: "Function", action, timeSec: 0, toy, apiVer: 1 })),
+    );
   }
 
   /** Bascule volontairement en mode démo (sans matériel). */
@@ -108,8 +157,8 @@ class LovenseController {
     if (!this.connected) return;
     const lv = this.level(scaled);
     try {
-      if (lv <= 0) await this.post({ command: "Function", action: "Stop", timeSec: 0, toy: "", apiVer: 1 });
-      else await this.post({ command: "Function", action: `Vibrate:${lv}`, timeSec: 0, toy: "", apiVer: 1 });
+      if (lv <= 0) await this.sendFunction("Stop");
+      else await this.sendFunction(`Vibrate:${lv}`);
     } catch {
       /* réseau instable → on ignore, la prochaine impulsion corrigera */
     }
@@ -163,7 +212,7 @@ class LovenseController {
       this.stopTimer = null;
     }
     if (!this.mock && this.connected) {
-      this.post({ command: "Function", action: "Stop", timeSec: 0, toy: "", apiVer: 1 }).catch(() => {});
+      this.sendFunction("Stop").catch(() => {});
     }
     this.emit(0);
   }
