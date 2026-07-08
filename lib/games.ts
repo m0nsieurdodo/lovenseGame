@@ -18,6 +18,8 @@ export const GAMES: GameMeta[] = [
   { id: "casino", name: "Grand Saloon", tagline: "5 rouleaux, 3 jackpots, vibes surprises", icon: "🎰", accent: "violet", href: "/games/casino", ready: true },
   { id: "breakout", name: "Breakout", tagline: "Brise le mur, monte le combo", icon: "▦", accent: "rose", href: "/games/breakout", ready: true },
   { id: "rhythm", name: "Boîte à Rythme", tagline: "16 pads, 16 sensations", icon: "🎛️", accent: "rose", href: "/games/rhythm", ready: true },
+  { id: "scanline", name: "Scanline", tagline: "Suis la ligne, tiens le tempo", icon: "♫", accent: "cyan", href: "/games/scanline", ready: true },
+  { id: "descente", name: "Descente", tagline: "Roguelike : le risque EST l'intensité", icon: "🕳️", accent: "violet", href: "/games/descente", ready: true },
 ];
 
 export function getGame(id: string): GameMeta | undefined {

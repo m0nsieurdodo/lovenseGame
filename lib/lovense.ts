@@ -168,6 +168,16 @@ class LovenseController {
     this.raw(this.baseline);
   }
 
+  /** Pilotage continu (0-100 %) sans retombée automatique — utilisé par les
+      moteurs haptiques qui recalculent le niveau à chaque tick (Descente, Scanline). */
+  setContinuous(pct: number) {
+    if (this.stopTimer) {
+      clearTimeout(this.stopTimer);
+      this.stopTimer = null;
+    }
+    this.raw(pct);
+  }
+
   /** Impulsion : vibre à pct pendant durMs puis retombe sur le fond warm-up. */
   pulse(pct: number, durMs: number) {
     if (this.stopTimer) {
