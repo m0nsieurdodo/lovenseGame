@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Lovense } from "@/lib/lovense";
+import { Lovense, type ToyInfo } from "@/lib/lovense";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from "@/lib/settings";
 
 type Status = "idle" | "connecting" | "connected" | "error";
@@ -12,6 +12,9 @@ interface LovenseCtx {
   status: Status;
   statusText: string;
   vibe: number; // niveau courant 0-100 (pour feedback visuel)
+  toys: ToyInfo[]; // toys détectés à la connexion
+  activeToys: Set<string>; // ids des toys qui reçoivent les vibrations
+  toggleToy: (id: string) => void;
   connect: () => Promise<void>;
   test: () => void;
   stop: () => void;
@@ -30,6 +33,8 @@ export function LovenseProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("idle");
   const [statusText, setStatusText] = useState("Non connecté");
   const [vibe, setVibe] = useState(0);
+  const [toys, setToys] = useState<ToyInfo[]>([]);
+  const [activeToys, setActiveToys] = useState<Set<string>>(new Set());
   const loaded = useRef(false);
 
   // Chargement initial depuis localStorage (client only) + abonnement au niveau de vibration.
@@ -60,10 +65,25 @@ export function LovenseProvider({ children }: { children: ReactNode }) {
     if (r.ok) {
       setStatus("connected");
       setStatusText(r.names ? `Connecté · ${r.names}` : "Connecté");
+      const list = r.toys ?? [];
+      setToys(list);
+      setActiveToys(new Set(list.map((t) => t.id)));
     } else {
       setStatus("error");
       setStatusText("Échec — vérifie l'IP / le transport");
     }
+  };
+
+  const toggleToy = (id: string) => {
+    // Effet de bord hors de l'updater (StrictMode double-invoque les updaters).
+    const on = !activeToys.has(id);
+    Lovense.setToyActive(id, on);
+    setActiveToys((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   };
 
   const test = () => Lovense.test();
@@ -73,7 +93,7 @@ export function LovenseProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ settings, update, status, statusText, vibe, connect, test, stop }}>
+    <Ctx.Provider value={{ settings, update, status, statusText, vibe, toys, activeToys, toggleToy, connect, test, stop }}>
       {children}
     </Ctx.Provider>
   );

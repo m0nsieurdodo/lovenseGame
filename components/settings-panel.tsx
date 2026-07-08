@@ -8,8 +8,10 @@ import { Button, Card, CardTitle, GlowBar, StatusDot } from "./ui";
    La connexion (IP / transport / Connecter) ne se règle qu'au HUB : dans un
    jeu, on affiche juste le statut + un lien de retour pour éviter d'avoir
    une connexion "par jeu" qui prête à confusion. */
+const TOY_ICONS: Record<string, string> = { gemini: "🔗", solace: "🌀" };
+
 export function SettingsPanel({ showConnection = true }: { showConnection?: boolean }) {
-  const { settings, update, status, statusText, vibe, connect, test, stop } = useLovense();
+  const { settings, update, status, statusText, vibe, toys, activeToys, toggleToy, connect, test, stop } = useLovense();
 
   return (
     <div className="flex flex-col gap-3">
@@ -68,6 +70,34 @@ export function SettingsPanel({ showConnection = true }: { showConnection?: bool
           <StatusDot state={status} />
           <span>{statusText}</span>
         </div>
+
+        {/* Sélection des jouets : chacun peut être coupé sans déconnecter. */}
+        {status === "connected" && toys.length > 0 && (
+          <div className="mt-3 flex flex-col gap-1.5">
+            <div className="text-[10px] uppercase tracking-widest text-muted">Jouets ({toys.length})</div>
+            {toys.map((t) => {
+              const on = activeToys.has(t.id);
+              const label = t.nickName || t.name;
+              return (
+                <label
+                  key={t.id}
+                  className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-xs transition ${
+                    on ? "border-line-soft bg-[#0d0b20] text-ink" : "border-line-soft bg-transparent text-muted opacity-60"
+                  }`}
+                >
+                  <span className="flex items-center gap-2 capitalize">
+                    <span>{TOY_ICONS[t.name.toLowerCase()] ?? "💠"}</span>
+                    {label}
+                    {typeof t.battery === "number" && t.battery >= 0 && (
+                      <span className="font-mono text-[10px] text-muted">{t.battery}%</span>
+                    )}
+                  </span>
+                  <input type="checkbox" checked={on} onChange={() => toggleToy(t.id)} className="accent-rose" />
+                </label>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       <Card>
