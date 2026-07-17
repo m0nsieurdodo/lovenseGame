@@ -31,7 +31,7 @@ export interface ConnectResult {
 class LovenseController {
   private connected = false;
   private base = "";
-  private stopTimer: ReturnType<typeof setTimeout> | null = null;
+  private scheduledTimers = new Set<ReturnType<typeof setTimeout>>();
   private baseline = 0; // fond warm-up (pct 0-100)
   private scale = 1; // intensité max (0..1)
   private warmup = false;
@@ -113,7 +113,7 @@ class LovenseController {
   setToyActive(id: string, on: boolean) {
     if (on) {
       this.active.add(id);
-      if (!this.stopTimer) this.toBaseline();
+      if (this.scheduledTimers.size === 0) this.toBaseline();
     } else {
       this.active.delete(id);
       if (!this.mock && this.connected) {
@@ -168,35 +168,38 @@ class LovenseController {
     this.raw(this.baseline);
   }
 
+  /** Toute séquence différée doit passer ici afin qu'un STOP puisse l'annuler. */
+  private schedule(callback: () => void, delayMs: number) {
+    const timer = setTimeout(() => {
+      this.scheduledTimers.delete(timer);
+      callback();
+    }, delayMs);
+    this.scheduledTimers.add(timer);
+    return timer;
+  }
+
+  private cancelScheduled() {
+    this.scheduledTimers.forEach((timer) => clearTimeout(timer));
+    this.scheduledTimers.clear();
+  }
+
   /** Pilotage continu (0-100 %) sans retombée automatique — utilisé par les
       moteurs haptiques qui recalculent le niveau à chaque tick (Descente, Scanline). */
   setContinuous(pct: number) {
-    if (this.stopTimer) {
-      clearTimeout(this.stopTimer);
-      this.stopTimer = null;
-    }
+    this.cancelScheduled();
     this.raw(pct);
   }
 
   /** Impulsion : vibre à pct pendant durMs puis retombe sur le fond warm-up. */
   pulse(pct: number, durMs: number) {
-    if (this.stopTimer) {
-      clearTimeout(this.stopTimer);
-      this.stopTimer = null;
-    }
+    this.cancelScheduled();
     this.raw(pct);
-    this.stopTimer = setTimeout(() => {
-      this.toBaseline();
-      this.stopTimer = null;
-    }, durMs);
+    this.schedule(() => this.toBaseline(), durMs);
   }
 
   /** Climax : montée en pulsations jusqu'à 100% (gros événement gameplay). */
   climax() {
-    if (this.stopTimer) {
-      clearTimeout(this.stopTimer);
-      this.stopTimer = null;
-    }
+    this.cancelScheduled();
     const seq: [number, number][] = [
       [100, 260],
       [60, 110],
@@ -206,21 +209,15 @@ class LovenseController {
     ];
     let t = 0;
     seq.forEach(([p, d]) => {
-      setTimeout(() => this.raw(p), t);
+      this.schedule(() => this.raw(p), t);
       t += d;
     });
-    this.stopTimer = setTimeout(() => {
-      this.toBaseline();
-      this.stopTimer = null;
-    }, t);
+    this.schedule(() => this.toBaseline(), t);
   }
 
   /** Silence temporaire (pause / game over) — garde la config. */
   mute() {
-    if (this.stopTimer) {
-      clearTimeout(this.stopTimer);
-      this.stopTimer = null;
-    }
+    this.cancelScheduled();
     if (!this.mock && this.connected) {
       this.sendFunction("Stop").catch(() => {});
     }
@@ -232,10 +229,7 @@ class LovenseController {
 
   /** STOP d'urgence — coupe tout + désarme le warm-up. */
   async stop() {
-    if (this.stopTimer) {
-      clearTimeout(this.stopTimer);
-      this.stopTimer = null;
-    }
+    this.cancelScheduled();
     this.baseline = 0;
     this.warmup = false;
     if (!this.mock && this.connected) {
@@ -251,7 +245,7 @@ class LovenseController {
   /* ---- calibrage global ---- */
   setScale(pct: number) {
     this.scale = Math.max(0, Math.min(1, pct / 100));
-    if (!this.stopTimer) this.toBaseline();
+    if (this.scheduledTimers.size === 0) this.toBaseline();
   }
   setWarmup(on: boolean) {
     this.warmup = on;
@@ -259,7 +253,7 @@ class LovenseController {
   /** Recalcule le fond selon le niveau : 5% puis +3%/niveau, plafond 45%. */
   updateWarmup(lvl: number) {
     this.baseline = this.warmup ? Math.min(45, 5 + (lvl - 1) * 3) : 0;
-    if (!this.stopTimer) this.toBaseline();
+    if (this.scheduledTimers.size === 0) this.toBaseline();
   }
 
   /** Test manuel depuis les réglages. */

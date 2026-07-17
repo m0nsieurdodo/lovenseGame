@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Lovense, type ToyInfo } from "@/lib/lovense";
+import { isEmergencyStopKey, shouldStopWhenDocumentHidden } from "@/lib/haptic-safety";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from "@/lib/settings";
 
 type Status = "idle" | "connecting" | "connected" | "error";
@@ -46,6 +47,32 @@ export function LovenseProvider({ children }: { children: ReactNode }) {
     loaded.current = true;
     const off = Lovense.onVibe(setVibe);
     return off;
+  }, []);
+
+  // Kill switch global : STOP sur Échap/Espace, masquage ou fermeture de l'onglet.
+  useEffect(() => {
+    const emergencyStop = () => {
+      void Lovense.stop();
+      setSettings((prev) => ({ ...prev, warmup: false }));
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isEmergencyStopKey(event.key)) return;
+      event.preventDefault();
+      emergencyStop();
+    };
+    const onVisibilityChange = () => {
+      if (shouldStopWhenDocumentHidden(document.visibilityState)) emergencyStop();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("pagehide", emergencyStop);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pagehide", emergencyStop);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      void Lovense.stop();
+    };
   }, []);
 
   // Persistance + propagation du calibrage au contrôleur.
