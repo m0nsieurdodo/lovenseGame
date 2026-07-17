@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compileTileChart, generateDemoChart, judgeTileHit, tileSpeedForBpm } from "./engine";
+import { compileTileChart, generateDemoChart, judgeTileHit, tileSpeedForBpm, tileTrackDurationSec } from "./engine";
 
 describe("Neon Tiles chart", () => {
   it("converts beat positions into hit timestamps from BPM and offset", () => {
@@ -29,6 +29,10 @@ describe("Neon Tiles chart", () => {
   it("uses a faster but bounded falling speed for a higher BPM", () => {
     expect(tileSpeedForBpm(180)).toBeGreaterThan(tileSpeedForBpm(90));
     expect(tileSpeedForBpm(500)).toBeLessThanOrEqual(1);
+  });
+
+  it("calculates enough audio duration to contain the chart and its release tail", () => {
+    expect(tileTrackDurationSec({ bpm: 120, offsetMs: 500, durationBeats: 8 })).toBe(6);
   });
 
   it("generates a deterministic demo chart that is playable in four lanes", () => {
