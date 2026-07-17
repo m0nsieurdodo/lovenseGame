@@ -13,8 +13,10 @@ import {
   type TileJudgement,
 } from "@/lib/neon-tiles/engine";
 import { renderTileTrack } from "@/lib/neon-tiles/synth-track";
+import { AudioRenderTimeoutError, renderWithin } from "@/lib/neon-tiles/render-with-deadline";
 
 const CHART = generateDemoChart(128);
+const AUDIO_RENDER_TIMEOUT_MS = 8_000;
 const TILES = compileTileChart(CHART);
 const APPROACH_MS = 1_800;
 const HIT_LINE_PERCENT = 76;
@@ -108,7 +110,9 @@ export default function NeonTilesPage() {
       if (!clockRef.current) clockRef.current = new AudioClock();
       const clock = clockRef.current;
       await clock.unlock();
-      if (!bufferRef.current) bufferRef.current = await renderTileTrack(CHART);
+      if (!bufferRef.current) {
+        bufferRef.current = await renderWithin(renderTileTrack(CHART), AUDIO_RENDER_TIMEOUT_MS);
+      }
 
       cancelAnimationFrame(rafRef.current);
       Lovense.mute();
@@ -119,6 +123,11 @@ export default function NeonTilesPage() {
       setOverlay((current) => ({ ...current, show: false }));
       clock.play(bufferRef.current, 900);
       rafRef.current = requestAnimationFrame(tick);
+    } catch (error) {
+      const message = error instanceof AudioRenderTimeoutError
+        ? "La synthèse musicale n’a pas répondu. Réessaie : le bouton ne restera plus bloqué."
+        : "La synthèse musicale a échoué. Réessaie après avoir autorisé l’audio dans le navigateur.";
+      setOverlay({ show: true, title: "MUSIQUE INDISPONIBLE", sub: message, btn: "↻ Réessayer" });
     } finally {
       setBusy(false);
     }
