@@ -32,6 +32,11 @@ export function beatDurationMs(bpm: number): number {
   return 60_000 / bpm;
 }
 
+/** Durée du rendu audio, incluant l'offset et une courte retombée finale. */
+export function tileTrackDurationSec(chart: Pick<TileChart, "bpm" | "offsetMs" | "durationBeats">): number {
+  return chart.offsetMs / 1_000 + (chart.durationBeats * beatDurationMs(chart.bpm)) / 1_000 + 1.5;
+}
+
 export function compileTileChart(chart: TileChart): CompiledTile[] {
   if (!(chart.bpm > 0)) throw new Error("bpm doit être supérieur à 0");
   if (!Number.isFinite(chart.offsetMs)) throw new Error("offsetMs doit être un nombre fini");
