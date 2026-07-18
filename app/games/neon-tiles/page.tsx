@@ -12,7 +12,7 @@ import {
   judgeTileHit,
   type TileJudgement,
 } from "@/lib/neon-tiles/engine";
-import { renderTileTrack } from "@/lib/neon-tiles/synth-track";
+import { createSilentTileTrack, playTileTrackLive, renderTileTrack } from "@/lib/neon-tiles/synth-track";
 import { AudioRenderTimeoutError, renderWithin } from "@/lib/neon-tiles/render-with-deadline";
 
 const CHART = generateDemoChart(128);
@@ -54,6 +54,7 @@ export default function NeonTilesPage() {
   const rafRef = useRef(0);
   const clockRef = useRef<AudioClock | null>(null);
   const bufferRef = useRef<AudioBuffer | null>(null);
+  const liveMusicRef = useRef(false);
   const statesRef = useRef<Map<number, "pending" | "hit" | "miss">>(new Map());
   const statsRef = useRef<Stats>(INITIAL_STATS);
 
@@ -111,7 +112,13 @@ export default function NeonTilesPage() {
       const clock = clockRef.current;
       await clock.unlock();
       if (!bufferRef.current) {
-        bufferRef.current = await renderWithin(renderTileTrack(CHART), AUDIO_RENDER_TIMEOUT_MS);
+        try {
+          bufferRef.current = await renderWithin(renderTileTrack(CHART), AUDIO_RENDER_TIMEOUT_MS);
+        } catch (error) {
+          if (!(error instanceof AudioRenderTimeoutError) || !clock.context) throw error;
+          bufferRef.current = createSilentTileTrack(clock.context, CHART);
+          liveMusicRef.current = true;
+        }
       }
 
       cancelAnimationFrame(rafRef.current);
@@ -121,7 +128,11 @@ export default function NeonTilesPage() {
       setNowMs(-900);
       runningRef.current = true;
       setOverlay((current) => ({ ...current, show: false }));
+      const context = clock.context;
+      if (!context) throw new Error("Contexte audio indisponible après déverrouillage.");
+      const startAt = context.currentTime + 0.9;
       clock.play(bufferRef.current, 900);
+      if (liveMusicRef.current) playTileTrackLive(context, CHART, startAt);
       rafRef.current = requestAnimationFrame(tick);
     } catch (error) {
       const message = error instanceof AudioRenderTimeoutError
