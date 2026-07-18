@@ -3,20 +3,44 @@ import { beatDurationMs, tileTrackDurationSec, type TileChart } from "./engine";
 const SAMPLE_RATE = 44_100;
 const ROOTS = [55, 43.65, 65.41, 49] as const; // Am / F / C / G
 const ARPEGGIO = [4, 6, 8, 12] as const;
+type SynthContext = BaseAudioContext;
 
 /**
  * Musique de démonstration originale, rendue localement via Web Audio.
  * Une future piste MP3 pourra être chargée par la même AudioClock.
  */
 export async function renderTileTrack(chart: TileChart): Promise<AudioBuffer> {
-  const beatSec = beatDurationMs(chart.bpm) / 1_000;
   const ctx = new OfflineAudioContext(2, Math.ceil(tileTrackDurationSec(chart) * SAMPLE_RATE), SAMPLE_RATE);
+  const master = createMaster(ctx);
+  scheduleTileTrack(ctx, chart, master, 0);
+  return ctx.startRendering();
+}
+
+/**
+ * Piste silencieuse servant d'horloge lorsque le rendu hors-ligne est
+ * indisponible. La musique est alors planifiée directement en temps réel.
+ */
+export function createSilentTileTrack(ctx: AudioContext, chart: TileChart): AudioBuffer {
+  return ctx.createBuffer(1, Math.ceil(tileTrackDurationSec(chart) * ctx.sampleRate), ctx.sampleRate);
+}
+
+/** Planifie le même morceau sur le contexte audio en temps réel. */
+export function playTileTrackLive(ctx: AudioContext, chart: TileChart, startAt: number): void {
+  const master = createMaster(ctx);
+  scheduleTileTrack(ctx, chart, master, startAt);
+}
+
+function createMaster(ctx: SynthContext): GainNode {
   const master = ctx.createGain();
   master.gain.value = 0.62;
   master.connect(ctx.destination);
+  return master;
+}
 
+function scheduleTileTrack(ctx: SynthContext, chart: TileChart, master: AudioNode, startAt: number): void {
+  const beatSec = beatDurationMs(chart.bpm) / 1_000;
   const noise = noiseBuffer(ctx);
-  const at = (beat: number) => chart.offsetMs / 1_000 + beat * beatSec;
+  const at = (beat: number) => startAt + chart.offsetMs / 1_000 + beat * beatSec;
   const rootAt = (beat: number) => ROOTS[Math.floor(beat / 4) % ROOTS.length];
 
   for (let beat = 0; beat < chart.durationBeats; beat++) {
@@ -29,25 +53,23 @@ export async function renderTileTrack(chart: TileChart): Promise<AudioBuffer> {
     bass(ctx, master, at(beat), beatSec * 0.4, rootAt(beat));
     if (step >= 8) pluck(ctx, master, at(beat), beatSec * 0.34, rootAt(beat) * ARPEGGIO[step % ARPEGGIO.length]);
   }
-
-  return ctx.startRendering();
 }
 
-function noiseBuffer(ctx: OfflineAudioContext): AudioBuffer {
+function noiseBuffer(ctx: SynthContext): AudioBuffer {
   const buffer = ctx.createBuffer(1, SAMPLE_RATE, SAMPLE_RATE);
   const data = buffer.getChannelData(0);
   for (let index = 0; index < data.length; index++) data[index] = Math.random() * 2 - 1;
   return buffer;
 }
 
-function envelope(ctx: OfflineAudioContext, at: number, peak: number, release: number): GainNode {
+function envelope(ctx: SynthContext, at: number, peak: number, release: number): GainNode {
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(peak, at);
   gain.gain.exponentialRampToValueAtTime(0.001, at + release);
   return gain;
 }
 
-function kick(ctx: OfflineAudioContext, out: AudioNode, at: number): void {
+function kick(ctx: SynthContext, out: AudioNode, at: number): void {
   const oscillator = ctx.createOscillator();
   oscillator.type = "sine";
   oscillator.frequency.setValueAtTime(150, at);
@@ -57,7 +79,7 @@ function kick(ctx: OfflineAudioContext, out: AudioNode, at: number): void {
   oscillator.stop(at + 0.3);
 }
 
-function hat(ctx: OfflineAudioContext, out: AudioNode, noise: AudioBuffer, at: number, peak: number): void {
+function hat(ctx: SynthContext, out: AudioNode, noise: AudioBuffer, at: number, peak: number): void {
   const source = ctx.createBufferSource();
   source.buffer = noise;
   const filter = ctx.createBiquadFilter();
@@ -68,7 +90,7 @@ function hat(ctx: OfflineAudioContext, out: AudioNode, noise: AudioBuffer, at: n
   source.stop(at + 0.06);
 }
 
-function clap(ctx: OfflineAudioContext, out: AudioNode, noise: AudioBuffer, at: number): void {
+function clap(ctx: SynthContext, out: AudioNode, noise: AudioBuffer, at: number): void {
   const source = ctx.createBufferSource();
   source.buffer = noise;
   const filter = ctx.createBiquadFilter();
@@ -80,7 +102,7 @@ function clap(ctx: OfflineAudioContext, out: AudioNode, noise: AudioBuffer, at: 
   source.stop(at + 0.16);
 }
 
-function bass(ctx: OfflineAudioContext, out: AudioNode, at: number, duration: number, frequency: number): void {
+function bass(ctx: SynthContext, out: AudioNode, at: number, duration: number, frequency: number): void {
   const oscillator = ctx.createOscillator();
   oscillator.type = "sawtooth";
   oscillator.frequency.value = frequency;
@@ -96,7 +118,7 @@ function bass(ctx: OfflineAudioContext, out: AudioNode, at: number, duration: nu
   oscillator.stop(at + duration + 0.05);
 }
 
-function pluck(ctx: OfflineAudioContext, out: AudioNode, at: number, duration: number, frequency: number): void {
+function pluck(ctx: SynthContext, out: AudioNode, at: number, duration: number, frequency: number): void {
   const oscillator = ctx.createOscillator();
   oscillator.type = "triangle";
   oscillator.frequency.value = frequency;
