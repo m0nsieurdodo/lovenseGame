@@ -5,6 +5,7 @@
    ============================================================ */
 import { Lovense } from "./lovense";
 import { saveBestScore } from "./settings";
+import { tetrisHapticPlan, type TetrisHapticPlan } from "./tetris-haptics";
 import type { Overlay } from "./engine-types";
 
 const COLS = 10;
@@ -117,6 +118,10 @@ export class TetrisEngine {
   private canPlay() {
     return this.running && !this.paused && !this.over && !this.clearing;
   }
+  private playHaptic(plan: TetrisHapticPlan) {
+    if (plan.kind === "climax") Lovense.climax();
+    else Lovense.pulse(plan.intensity, plan.durationMs);
+  }
 
   /* ---------- actions (appelées par l'UI) ---------- */
   move(dx: number) {
@@ -144,6 +149,7 @@ export class TetrisEngine {
     }
     this.score += d * 2;
     this.draw();
+    if (d > 0) this.playHaptic(tetrisHapticPlan({ kind: "hard_drop" }));
     this.lock();
   }
   tryRotate() {
@@ -153,6 +159,7 @@ export class TetrisEngine {
       if (!this.collide(r, this.cur.x + k, this.cur.y)) {
         this.cur.shape = r;
         this.cur.x += k;
+        this.playHaptic(tetrisHapticPlan({ kind: "rotate" }));
         this.draw();
         return;
       }
@@ -173,7 +180,7 @@ export class TetrisEngine {
           this.grid[gy][gx] = this.cur.type;
         }
       }
-    Lovense.pulse(10, 130); // 🔔 pose de pièce → 10%
+    this.playHaptic(tetrisHapticPlan({ kind: "lock" }));
 
     const full: number[] = [];
     for (let y = 0; y < ROWS; y++) if (this.grid[y].every((c) => c)) full.push(y);
@@ -205,17 +212,13 @@ export class TetrisEngine {
     this.lines += cleared;
     this.score += [0, 100, 300, 500, 800][cleared] * this.level;
 
-    // 🔔 Mapping vibration (identique au V1)
-    if (cleared === 4) {
-      this.comboTetris++;
-      if (this.comboTetris >= 2) Lovense.climax(); // Tétris à la suite → 100% 🔥
-      else Lovense.pulse(70, 850); // Tétris simple → 70%
-    } else {
-      this.comboTetris = 0;
-      const map: Record<number, [number, number]> = { 1: [20, 320], 2: [30, 420], 3: [40, 600] };
-      const [pct, dur] = map[cleared];
-      Lovense.pulse(pct, dur);
-    }
+    if (cleared === 4) this.comboTetris++;
+    else this.comboTetris = 0;
+    this.playHaptic(tetrisHapticPlan({
+      kind: "clear",
+      lines: cleared as 1 | 2 | 3 | 4,
+      backToBackTetris: cleared === 4 && this.comboTetris >= 2,
+    }));
 
     const nl = 1 + Math.floor(this.lines / 10);
     if (nl !== this.level) {

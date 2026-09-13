@@ -5,12 +5,17 @@ import { GameShell } from "@/components/game-shell";
 import { GlowBar, Card, CardTitle } from "@/components/ui";
 import { useLovense } from "@/components/lovense-provider";
 import { TetrisEngine, type Overlay, type Stats } from "@/lib/tetris-engine";
+import { classifyTetrisGesture, type PointerPoint } from "@/lib/tetris-gestures";
 
 export default function TetrisPage() {
   const { vibe } = useLovense();
   const boardRef = useRef<HTMLCanvasElement>(null);
   const nextRef = useRef<HTMLCanvasElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const gestureStart = useRef<PointerPoint | null>(null);
   const engineRef = useRef<TetrisEngine | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [canFullscreen, setCanFullscreen] = useState(false);
 
   const [stats, setStats] = useState<Stats>({ score: 0, lines: 0, level: 1 });
   const [overlay, setOverlay] = useState<Overlay>({
@@ -59,6 +64,25 @@ export default function TetrisPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(document.fullscreenElement === shellRef.current);
+    setCanFullscreen(document.fullscreenEnabled);
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    syncFullscreen();
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    const shell = shellRef.current;
+    if (!shell || !document.fullscreenEnabled) return;
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await shell.requestFullscreen();
+    } catch {
+      // Fullscreen is optional: the game remains playable in its normal viewport.
+    }
+  };
+
   const startOrResume = () => {
     const e = engineRef.current;
     if (!e) return;
@@ -92,8 +116,33 @@ export default function TetrisPage() {
 
   const e = () => engineRef.current;
 
+  const onBoardPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    gestureStart.current = { x: event.clientX, y: event.clientY };
+  };
+  const onBoardPointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const start = gestureStart.current;
+    gestureStart.current = null;
+    if (!start) return;
+    event.preventDefault();
+    const cellSize = Math.max(8, event.currentTarget.clientWidth / 10);
+    const gesture = classifyTetrisGesture(start, { x: event.clientX, y: event.clientY }, cellSize);
+    const engine = e();
+    if (!engine) return;
+    if (gesture.action === "rotate") engine.tryRotate();
+    if (gesture.action === "move") for (let i = 0; i < Math.abs(gesture.amount); i++) engine.move(Math.sign(gesture.amount));
+    if (gesture.action === "soft_drop") for (let i = 0; i < gesture.amount; i++) engine.softDrop();
+    if (gesture.action === "hard_drop") engine.hardDrop();
+  };
+
   return (
-    <GameShell title="Tetris × Lovense" onTabChange={onTabChange} settingsExtra={<VibeMap />}>
+    <GameShell
+      title="Tetris × Lovense"
+      onTabChange={onTabChange}
+      settingsExtra={<VibeMap />}
+      rootRef={shellRef}
+      immersive={isFullscreen}
+    >
       {/* HUD */}
       <div className="flex flex-none items-stretch gap-2">
         <Stat k="SCORE" v={stats.score} />
@@ -107,8 +156,18 @@ export default function TetrisPage() {
           onClick={() => e()?.togglePause()}
           className="w-11 flex-none rounded-[10px] border border-line bg-[#0d0b20] text-lg text-ink active:border-cyan"
           title="Pause"
+          aria-label="Mettre le jeu en pause"
         >
           ⏸
+        </button>
+        <button
+          onClick={toggleFullscreen}
+          disabled={!canFullscreen}
+          className="w-11 flex-none rounded-[10px] border border-line bg-[#0d0b20] text-lg text-ink active:border-cyan disabled:opacity-40"
+          title={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
+          aria-label={isFullscreen ? "Quitter le plein écran" : "Passer en plein écran"}
+        >
+          {isFullscreen ? "⤢" : "⛶"}
         </button>
       </div>
 
@@ -126,6 +185,10 @@ export default function TetrisPage() {
             height={600}
             className="block rounded-[14px] border-2 border-[#2b2750] bg-gradient-to-b from-[#0b0920] to-[#0a0818]"
             style={{ boxShadow: "0 0 40px #00e5ff22, inset 0 0 60px #0006", touchAction: "none" }}
+            onPointerDown={onBoardPointerDown}
+            onPointerUp={onBoardPointerUp}
+            onPointerCancel={() => { gestureStart.current = null; }}
+            aria-label="Plateau Tetris : glisse pour déplacer ou descendre, touche pour tourner"
           />
           {overlay.show && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-[14px] bg-[#05040ccc] p-4 text-center backdrop-blur-sm">
@@ -142,11 +205,12 @@ export default function TetrisPage() {
         </div>
       </div>
 
-      {/* Contrôles tactiles */}
+      {/* Gestes directs sur le plateau ; les boutons restent une alternative tactile. */}
+      <div className="flex-none text-center text-[10px] tracking-wide text-muted">Touche : tourner · Glisse : déplacer · Descends : drop</div>
       <div className="grid flex-none grid-cols-3 gap-2">
-        <TouchBtn label="◀" bind={bindTouch(() => e()?.move(-1), true)} />
-        <TouchBtn label="⟳" bind={bindTouch(() => e()?.tryRotate())} />
-        <TouchBtn label="▶" bind={bindTouch(() => e()?.move(1), true)} />
+        <TouchBtn label="Gauche" bind={bindTouch(() => e()?.move(-1), true)} />
+        <TouchBtn label="Tourner" bind={bindTouch(() => e()?.tryRotate())} />
+        <TouchBtn label="Droite" bind={bindTouch(() => e()?.move(1), true)} />
         <div className="col-span-3 grid grid-cols-2 gap-2">
           <TouchBtn label="↓ Doux" bind={bindTouch(() => e()?.softDrop(), true)} small />
           <TouchBtn label="⤓ Hard" bind={bindTouch(() => e()?.hardDrop())} small />
@@ -184,13 +248,13 @@ function VibeMap() {
     <Card>
       <CardTitle>Intensités — Tetris</CardTitle>
       <div className="text-[11px] leading-[1.9] text-muted">
-        <b className="text-ink">Pose de pièce</b> → 10%
+        <b className="text-ink">Pose</b> → 12% · <b className="text-ink">Rotation</b> → 6% · <b className="text-ink">Hard drop</b> → 18%
         <br />
-        <b className="text-ink">1 ligne</b> → 20% · <b className="text-ink">2</b> → 30%
+        <b className="text-ink">1 ligne</b> → 28% · <b className="text-ink">2</b> → 44%
         <br />
-        <b className="text-ink">3 lignes</b> → 40% · <b className="text-ink">4 (Tétris)</b> → 70%
+        <b className="text-ink">3 lignes</b> → 62% · <b className="text-ink">4 (Tétris)</b> → 82%
         <br />
-        <b className="text-ink">Tétris à la suite</b> → 100% 🔥
+        <b className="text-ink">Tétris à la suite</b> → séquence maximale 🔥
       </div>
     </Card>
   );

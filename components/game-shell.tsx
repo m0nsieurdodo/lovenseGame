@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, type RefObject } from "react";
 import { useLovense } from "./lovense-provider";
 import { SettingsPanel } from "./settings-panel";
 import { StatusDot } from "./ui";
@@ -15,11 +15,15 @@ export function GameShell({
   children,
   settingsExtra,
   onTabChange,
+  rootRef,
+  immersive = false,
 }: {
   title: string;
   children: ReactNode;
   settingsExtra?: ReactNode;
   onTabChange?: (tab: Tab) => void;
+  rootRef?: RefObject<HTMLDivElement | null>;
+  immersive?: boolean;
 }) {
   const { status } = useLovense();
   const [tab, setTab] = useState<Tab>("game");
@@ -30,7 +34,10 @@ export function GameShell({
   };
 
   return (
-    <div className="mx-auto flex h-dvh w-full max-w-[460px] flex-col gap-2.5 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-[calc(env(safe-area-inset-top)+8px)]">
+    <div
+      ref={rootRef}
+      className={`mx-auto flex h-dvh w-full flex-col gap-2.5 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-[calc(env(safe-area-inset-top)+8px)] ${immersive ? "max-w-none bg-[#070511]" : "max-w-[460px]"}`}
+    >
       {/* Header */}
       <header className="flex flex-none flex-col gap-2">
         <div className="flex items-center justify-between gap-2.5">
