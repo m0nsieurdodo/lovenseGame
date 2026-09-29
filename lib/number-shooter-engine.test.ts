@@ -43,6 +43,14 @@ describe("Number Shooter engine", () => {
     expect(result.state.score).toBe(12);
   });
 
+  it("pulls every column back to the ceiling after a fusion so no block floats", () => {
+    const state = createGame({ board: [[2, null, null, null, null], [null, 4, null, null, null]], maxRows: 7 });
+    const result = shootBlock(state, 0, 2);
+
+    expect(result.state.board[0].slice(0, 2)).toEqual([null, 8]);
+    expect(result.state.board.slice(1).every((row) => row[0] === null && row[1] === null)).toBe(true);
+  });
+
   it("ends the game when a shot reaches the launcher row", () => {
     const state: NumberShooterState = createGame({ board: [[2], [4], [8], [16], [32], [64]], maxRows: 7 });
     const result = shootBlock(state, 0, 128);
