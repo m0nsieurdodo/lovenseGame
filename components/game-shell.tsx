@@ -17,6 +17,7 @@ export function GameShell({
   onTabChange,
   rootRef,
   immersive = false,
+  showGlobalSettings = true,
 }: {
   title: string;
   children: ReactNode;
@@ -24,6 +25,7 @@ export function GameShell({
   onTabChange?: (tab: Tab) => void;
   rootRef?: RefObject<HTMLDivElement | null>;
   immersive?: boolean;
+  showGlobalSettings?: boolean;
 }) {
   const { status } = useLovense();
   const [tab, setTab] = useState<Tab>("game");
@@ -71,7 +73,7 @@ export function GameShell({
         <section
           className={`w-full flex-1 overflow-y-auto pr-0.5 ${tab === "settings" ? "block" : "hidden"}`}
         >
-          <SettingsPanel showConnection={false} />
+          {showGlobalSettings && <SettingsPanel showConnection={false} />}
           {settingsExtra && <div className="mt-3">{settingsExtra}</div>}
         </section>
       </main>
