@@ -35,7 +35,10 @@ export function NumberShooterGame() {
 
   const activeToy = toys.find((toy) => toy.id === toyId && toy.supportsVibrate);
   const maxAllowed = allowAboveTwelve ? 20 : 12;
-  const laneFill = useMemo(() => game.columns.map((lane) => lane.length / game.maxRows), [game]);
+  const laneFill = useMemo(() => Array.from({ length: LANE_COUNT }, (_, column) => {
+    const lowest = game.board.reduce((last, row, index) => row[column] === null ? last : index, -1);
+    return (lowest + 1) / game.maxRows;
+  }), [game]);
 
   useEffect(() => {
     setBest(Number(window.localStorage.getItem("lovense-arcade:number-shooter-best") || 0));
@@ -162,7 +165,7 @@ export function NumberShooterGame() {
       <div className="relative mx-auto min-h-0 w-full max-w-[450px] flex-1 overflow-hidden rounded-2xl border border-[#393059] bg-[#080916] shadow-[inset_0_0_55px_#0008,0_0_28px_#8a2be244]" onPointerMove={(event) => setSelectedLane(Math.min(LANE_COUNT - 1, Math.max(0, Math.floor((event.nativeEvent.offsetX / event.currentTarget.clientWidth) * LANE_COUNT))))}>
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-2 border-b border-violet/70 bg-gradient-to-r from-violet via-cyan to-violet" />
         <div className="grid h-full grid-cols-5 gap-1.5 px-2 pt-3 pb-2">
-          {game.columns.map((lane, column) => <Lane key={column} lane={lane} column={column} maxRows={game.maxRows} selected={selectedLane === column} fill={laneFill[column]} mergeKey={mergeKey} />)}
+          {Array.from({ length: LANE_COUNT }, (_, column) => <Lane key={column} board={game.board} column={column} maxRows={game.maxRows} selected={selectedLane === column} fill={laneFill[column]} mergeKey={mergeKey} />)}
         </div>
         {flying !== null && <div className="pointer-events-none absolute bottom-3 z-20 flex justify-center" style={{ width: "20%", left: `${flying * 20}%`, animation: "number-bloom-shot 280ms ease-out forwards" }}><NumberBlock value={current} flying /></div>}
         {(paused || game.gameOver) && <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[#070611e8] p-5 text-center backdrop-blur-sm"><b className="text-xl tracking-[.16em]">{game.gameOver ? "LANCEUR BLOQUÉ" : "PAUSE"}</b><p className="m-0 max-w-[250px] text-xs text-muted">{game.gameOver ? "Une pile a atteint la ligne de tir." : "Les vibrations ont été arrêtées."}</p><Button variant="primary" onClick={game.gameOver ? replay : togglePause}>{game.gameOver ? "↻ Rejouer" : "▶ Reprendre"}</Button></div>}
@@ -176,8 +179,8 @@ export function NumberShooterGame() {
   );
 }
 
-function Lane({ lane, column, maxRows, selected, fill, mergeKey }: { lane: number[]; column: number; maxRows: number; selected: boolean; fill: number; mergeKey: string }) {
-  return <div className={`relative flex min-w-0 flex-col overflow-hidden rounded-b-lg border-x border-b ${selected ? "border-cyan/60 bg-[#102137]" : "border-[#24213a] bg-[#111020]"}`}><div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#304a6733] to-transparent transition-[height] duration-300" style={{ height: `${fill * 100}%` }} />{lane.map((value, row) => <div key={`${row}-${value}`} className="relative z-10 aspect-square p-0.5"><NumberBlock value={value} active={mergeKey.startsWith(`${column}-${row}-${value}`)} /></div>)}{Array.from({ length: Math.max(0, maxRows - lane.length) }, (_, index) => <div className="relative z-10 flex-1" key={`space-${index}`} />)}</div>;
+function Lane({ board, column, maxRows, selected, fill, mergeKey }: { board: NumberShooterState["board"]; column: number; maxRows: number; selected: boolean; fill: number; mergeKey: string }) {
+  return <div className={`relative min-w-0 overflow-hidden rounded-b-lg border-x border-b ${selected ? "border-cyan/60 bg-[#102137]" : "border-[#24213a] bg-[#111020]"}`}><div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#304a6733] to-transparent transition-[height] duration-300" style={{ height: `${fill * 100}%` }} /><div className="relative z-10 grid h-full" style={{ gridTemplateRows: `repeat(${maxRows}, minmax(0, 1fr))` }}>{board.map((row, index) => <div key={index} className="min-h-0 p-0.5">{row[column] !== null && <NumberBlock value={row[column]} active={mergeKey.startsWith(`${column}-${index}-${row[column]}`)} />}</div>)}</div></div>;
 }
 
 function NumberBlock({ value, active = false, compact = false, flying = false }: { value: number; active?: boolean; compact?: boolean; flying?: boolean }) {
