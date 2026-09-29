@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GameShell } from "@/components/game-shell";
 import { Button, Card, CardTitle } from "@/components/ui";
+import { laneForLauncherPress } from "@/lib/number-shooter-controls";
 import { createGame, shootBlock, type NumberShooterEvent, type NumberShooterState } from "@/lib/number-shooter-engine";
 import { FetchCommandTransport, GameModeClient, NumberShooterHaptics, type GameModeToy } from "@/lib/number-shooter-lovense";
 
@@ -77,10 +78,12 @@ export function NumberShooterGame() {
     }
   };
 
-  const fire = () => {
+  const fire = (requestedLane = selectedLane) => {
     if (paused || game.gameOver || flying !== null) return;
     const firedValue = current;
-    const lane = selectedLane;
+    const lane = laneForLauncherPress({ pressedLane: requestedLane, selectedLane, laneCount: LANE_COUNT });
+    if (lane === null) return;
+    setSelectedLane(lane);
     const result = shootBlock(game, lane, firedValue);
     setFlying(lane);
     setMessage(`Tir du ${firedValue} dans le couloir ${lane + 1}…`);
@@ -165,7 +168,7 @@ export function NumberShooterGame() {
         {(paused || game.gameOver) && <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[#070611e8] p-5 text-center backdrop-blur-sm"><b className="text-xl tracking-[.16em]">{game.gameOver ? "LANCEUR BLOQUÉ" : "PAUSE"}</b><p className="m-0 max-w-[250px] text-xs text-muted">{game.gameOver ? "Une pile a atteint la ligne de tir." : "Les vibrations ont été arrêtées."}</p><Button variant="primary" onClick={game.gameOver ? replay : togglePause}>{game.gameOver ? "↻ Rejouer" : "▶ Reprendre"}</Button></div>}
       </div>
       <div className="mx-auto grid w-full max-w-[450px] grid-cols-5 gap-1.5 rounded-xl border border-line bg-[#0d0b20] p-2">
-        {Array.from({ length: LANE_COUNT }, (_, lane) => <button key={lane} onClick={() => { setSelectedLane(lane); fire(); }} className={`min-h-14 rounded-lg border text-center transition active:scale-95 ${selectedLane === lane ? "border-cyan bg-[#182b43] shadow-[0_0_16px_#00e5ff44]" : "border-[#272142] bg-[#141225]"}`} aria-label={`Tirer le bloc ${current} dans le couloir ${lane + 1}`}><span className="block text-[8px] text-muted">{lane + 1}</span>{selectedLane === lane ? <NumberBlock value={current} compact /> : <span className="text-muted">⌃</span>}</button>)}
+        {Array.from({ length: LANE_COUNT }, (_, lane) => <button key={lane} onClick={() => fire(lane)} className={`min-h-14 rounded-lg border text-center transition active:scale-95 ${selectedLane === lane ? "border-cyan bg-[#182b43] shadow-[0_0_16px_#00e5ff44]" : "border-[#272142] bg-[#141225]"}`} aria-label={`Tirer le bloc ${current} dans le couloir ${lane + 1}`}><span className="block text-[8px] text-muted">{lane + 1}</span>{selectedLane === lane ? <NumberBlock value={current} compact /> : <span className="text-muted">⌃</span>}</button>)}
       </div>
       <div className="flex items-center justify-between gap-2"><p className="m-0 min-w-0 flex-1 truncate text-[10px] text-muted">{message}</p><Button onClick={togglePause} aria-label="Pause">{paused ? "▶" : "Ⅱ"}</Button></div>
       <button onClick={emergencyStop} className="fixed bottom-4 right-4 z-40 rounded-full border-2 border-danger bg-[#320b17] px-4 py-3 text-xs font-black tracking-wide text-danger shadow-[0_0_20px_#ff3b3b77]">■ ARRÊT IMMÉDIAT</button>
