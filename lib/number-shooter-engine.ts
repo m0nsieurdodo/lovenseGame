@@ -30,7 +30,7 @@ export function createGame(seed: GameSeed = {}): NumberShooterState {
 }
 
 /** The block rises from the launcher, collides with the lowest cell in its lane,
- * then follows equal-value cardinal neighbours one fusion at a time. */
+ * then absorbs equal-value cardinal neighbours without leaving its own lane. */
 export function shootBlock(state: NumberShooterState, column: number, value: number): ShootResult {
   if (state.gameOver || column < 0 || column >= LANE_COUNT) return { state, events: [] };
   const board = state.board.map((row) => [...row]);
@@ -54,9 +54,9 @@ export function shootBlock(state: NumberShooterState, column: number, value: num
     if (!neighbour) break;
 
     const merged = currentValue * 2;
-    board[current.row][current.column] = null;
-    board[neighbour.row][neighbour.column] = merged;
-    current = settleAgainstCeiling(board, neighbour);
+    board[neighbour.row][neighbour.column] = null;
+    board[current.row][current.column] = merged;
+    current = settleAgainstCeiling(board, current);
     score += merged;
     combo += 1;
     maxValue = Math.max(maxValue, merged);

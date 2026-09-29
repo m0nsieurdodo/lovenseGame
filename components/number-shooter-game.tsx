@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GameShell } from "@/components/game-shell";
+import { useLovense } from "@/components/lovense-provider";
 import { Button, Card, CardTitle } from "@/components/ui";
+import { Lovense } from "@/lib/lovense";
 import { laneForLauncherPress } from "@/lib/number-shooter-controls";
 import { createGame, shootBlock, type NumberShooterEvent, type NumberShooterState } from "@/lib/number-shooter-engine";
 import { FetchCommandTransport, GameModeClient, NumberShooterHaptics, type GameModeToy } from "@/lib/number-shooter-lovense";
@@ -11,6 +13,7 @@ const LANE_COUNT = 5;
 type EventSettings = Record<"low" | "medium" | "high" | "reward", boolean>;
 
 export function NumberShooterGame() {
+  const { status: hubStatus, settings: hubSettings, activeToys, stop: stopHub } = useLovense();
   const [game, setGame] = useState<NumberShooterState>(() => createGame());
   const [current, setCurrent] = useState(2);
   const [next, setNext] = useState(2);
@@ -32,6 +35,7 @@ export function NumberShooterGame() {
   const [allowAboveTwelve, setAllowAboveTwelve] = useState(false);
   const [restMs, setRestMs] = useState(650);
   const [enabledEvents, setEnabledEvents] = useState<EventSettings>({ low: true, medium: true, high: true, reward: true });
+  const [usingHubConnection, setUsingHubConnection] = useState(false);
 
   const activeToy = toys.find((toy) => toy.id === toyId && toy.supportsVibrate);
   const maxAllowed = allowAboveTwelve ? 20 : 12;
@@ -49,8 +53,25 @@ export function NumberShooterGame() {
   }, []);
 
   useEffect(() => {
-    haptics.current?.configure({ toyId: activeToy?.id, maxIntensity, restMs, enabledEvents });
-  }, [activeToy?.id, enabledEvents, maxIntensity, restMs]);
+    haptics.current?.configure({
+      toyId: usingHubConnection ? "hub" : activeToy?.id,
+      maxIntensity: usingHubConnection ? Math.round(hubSettings.maxIntensity / 5) : maxIntensity,
+      restMs,
+      enabledEvents,
+    });
+  }, [activeToy?.id, enabledEvents, hubSettings.maxIntensity, maxIntensity, restMs, usingHubConnection]);
+
+  useEffect(() => {
+    if (hubStatus !== "connected" || activeToys.size === 0) return;
+    const director = new NumberShooterHaptics({
+      sendPattern: async (_toyId, strengths, intervalMs) => Lovense.playPattern(strengths, intervalMs),
+      stop: async () => { await stopHub(); },
+    }, (reason) => setConnectionMessage(`Vibration non envoyée : ${reason}`));
+    director.configure({ toyId: "hub", maxIntensity: Math.round(hubSettings.maxIntensity / 5), restMs, enabledEvents });
+    haptics.current = director;
+    setUsingHubConnection(true);
+    setConnectionMessage("Connexion et jouet(s) actif(s) du Hub utilisés pour ce jeu.");
+  }, [activeToys.size, enabledEvents, hubSettings.maxIntensity, hubStatus, restMs, stopHub]);
 
   const schedule = (fn: () => void, delay: number) => {
     const timer = setTimeout(() => {
@@ -63,6 +84,7 @@ export function NumberShooterGame() {
   const connect = async () => {
     if (!wantLovense) return;
     try {
+      setUsingHubConnection(false);
       const client = new GameModeClient(new FetchCommandTransport(normalizeAddress(address)));
       const found = await client.getToys();
       setToys(found);
@@ -165,7 +187,7 @@ export function NumberShooterGame() {
         }}
       />
     }>
-      <style>{`@keyframes number-bloom-shot { from { transform: translateY(0) scale(.92); opacity: 1; } to { transform: translateY(-74vh) scale(1); opacity: .15; } } @keyframes number-bloom-merge { 0% { transform: scale(.7); filter: brightness(2.8) saturate(1.8); box-shadow: 0 0 0 0 #fff, 0 0 28px #00e5ff; } 38% { transform: scale(1.19); filter: brightness(1.45) saturate(1.35); box-shadow: 0 0 0 10px #ffffff22, 0 0 34px #c13cff; } 100% { transform: scale(1); filter: brightness(1); box-shadow: inset 0 2px 5px #fff5, 0 4px 7px #0007; } }`}</style>
+      <style>{`@keyframes number-bloom-shot { from { transform: translateY(0) scale(.96); opacity: 1; } to { transform: translateY(-74vh) scale(1); opacity: .1; } } @keyframes number-bloom-merge { 0% { transform: scale(.9); filter: brightness(1.9); } 45% { transform: scale(1.1); filter: brightness(1.35); } 100% { transform: scale(1); filter: brightness(1); } } @keyframes number-bloom-ring { 0% { box-shadow: 0 0 0 0 #eaffffcc, 0 0 10px #00e5ff; } 100% { box-shadow: 0 0 0 14px #eaffff00, 0 0 22px #c13cff00; } } .number-bloom-merge { animation: number-bloom-merge 300ms ease-out both, number-bloom-ring 420ms ease-out both; will-change: transform, filter, box-shadow; }`}</style>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <Hud title="SCORE" value={game.score} /><div className="rounded-lg border border-[#554d80] bg-[#18122d] px-3 py-1 text-center"><span className="block text-[8px] tracking-[.18em] text-muted">OBJECTIF</span><b className="text-lg text-amber-300">512</b></div><Hud title="MAX" value={game.maxValue} />
       </div>
@@ -193,7 +215,7 @@ function Lane({ board, column, maxRows, selected, fill, mergeKey }: { board: Num
 
 function NumberBlock({ value, active = false, compact = false, flying = false }: { value: number; active?: boolean; compact?: boolean; flying?: boolean }) {
   const palette = value >= 256 ? "from-amber-400 to-orange-500" : value >= 64 ? "from-rose-500 to-red-500" : value >= 16 ? "from-violet-500 to-fuchsia-500" : value >= 4 ? "from-blue-500 to-cyan-400" : "from-teal-400 to-cyan-300";
-  return <span className={`flex h-full w-full items-center justify-center rounded-md border border-white/20 bg-gradient-to-br ${palette} font-black text-white shadow-[inset_0_2px_5px_#fff5,0_4px_7px_#0007] ${compact ? "min-h-7 text-sm" : "text-[clamp(.78rem,4.6vw,1.55rem)]"} ${active ? "animate-[number-bloom-merge_460ms_cubic-bezier(.16,1,.3,1)_both]" : ""} ${flying ? "aspect-square max-h-12 max-w-12 text-xl" : ""}`}>{value}</span>;
+  return <span className={`flex h-full w-full items-center justify-center rounded-md border border-white/20 bg-gradient-to-br ${palette} font-black text-white shadow-[inset_0_2px_5px_#fff5,0_4px_7px_#0007] ${compact ? "min-h-7 text-sm" : "text-[clamp(.78rem,4.6vw,1.55rem)]"} ${active ? "number-bloom-merge" : ""} ${flying ? "aspect-square max-h-12 max-w-12 text-xl" : ""}`}>{value}</span>;
 }
 
 function Hud({ title, value }: { title: string; value: number }) { return <div className="rounded-lg border border-line bg-[#0d0b20] px-3 py-1.5"><span className="block text-[8px] tracking-[.18em] text-muted">{title}</span><b className="font-mono text-xl leading-none tabular-nums">{value}</b></div>; }
