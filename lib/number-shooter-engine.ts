@@ -1,98 +1,70 @@
-export type Cell = number | null;
-export type Board = Cell[][];
-
-export interface Position {
-  row: number;
-  column: number;
-}
+export type NumberLane = number[];
 
 export interface NumberShooterState {
-  board: Board;
+  columns: NumberLane[];
   score: number;
   maxValue: number;
   combo: number;
   gameOver: boolean;
+  maxRows: number;
 }
 
 export type NumberShooterEvent =
-  | { type: "placed"; at: Position; value: number }
-  | { type: "merged"; at: Position; value: number }
+  | { type: "landed"; column: number; row: number; value: number }
+  | { type: "merged"; column: number; row: number; value: number }
   | { type: "game_over" };
 
-export interface DropResult {
+export interface ShootResult {
   state: NumberShooterState;
   events: NumberShooterEvent[];
 }
 
-const MATCH_DIRECTIONS: readonly Position[] = [
-  { row: 0, column: -1 },
-  { row: 1, column: 0 },
-  { row: 0, column: 1 },
-  { row: -1, column: 0 },
-];
+export interface GameSeed {
+  columns?: NumberLane[];
+  maxRows?: number;
+  score?: number;
+  maxValue?: number;
+  combo?: number;
+  gameOver?: boolean;
+}
 
-export function createGame(rows = 8, columns = 5): NumberShooterState {
+export function createGame(seed: GameSeed = {}): NumberShooterState {
+  const columns = seed.columns?.map((column) => [...column]) ?? Array.from({ length: 5 }, () => []);
   return {
-    board: Array.from({ length: rows }, () => Array<Cell>(columns).fill(null)),
-    score: 0,
-    maxValue: 2,
-    combo: 0,
-    gameOver: false,
+    columns,
+    maxRows: seed.maxRows ?? 7,
+    score: seed.score ?? 0,
+    maxValue: seed.maxValue ?? Math.max(2, ...columns.flat(), 2),
+    combo: seed.combo ?? 0,
+    gameOver: seed.gameOver ?? false,
   };
 }
 
-export function setCell(state: NumberShooterState, row: number, column: number, value: Cell): NumberShooterState {
-  const board = state.board.map((line) => [...line]);
-  board[row][column] = value;
-  return { ...state, board, maxValue: Math.max(state.maxValue, value ?? 0) };
-}
+/**
+ * The launcher sends a block upward. Lanes are stored ceiling → launcher, so
+ * a new block first attaches at the lane end, then may merge upward only.
+ */
+export function shootBlock(state: NumberShooterState, column: number, value: number): ShootResult {
+  if (state.gameOver || column < 0 || column >= state.columns.length) return { state, events: [] };
 
-export function canPlace(state: NumberShooterState, column: number): boolean {
-  return !state.gameOver && column >= 0 && column < state.board[0].length && state.board[0][column] === null;
-}
-
-export function dropBlock(state: NumberShooterState, column: number, value: number): DropResult {
-  if (!canPlace(state, column)) {
-    return { state: { ...state, gameOver: true, combo: 0 }, events: [{ type: "game_over" }] };
-  }
-
-  const board = state.board.map((line) => [...line]);
-  let row = board.length - 1;
-  while (board[row][column] !== null) row -= 1;
-  board[row][column] = value;
-
-  const events: NumberShooterEvent[] = [{ type: "placed", at: { row, column }, value }];
+  const columns = state.columns.map((lane) => [...lane]);
+  const lane = columns[column];
+  lane.push(value);
+  const events: NumberShooterEvent[] = [{ type: "landed", column, row: lane.length - 1, value }];
   let score = state.score;
   let maxValue = Math.max(state.maxValue, value);
   let combo = 0;
-  let current: Position = { row, column };
 
-  while (true) {
-    const currentValue = board[current.row][current.column];
-    if (currentValue === null) break;
-    const neighbour = MATCH_DIRECTIONS
-      .map((direction) => ({ row: current.row + direction.row, column: current.column + direction.column }))
-      .find(({ row: targetRow, column: targetColumn }) =>
-        targetRow >= 0 &&
-        targetRow < board.length &&
-        targetColumn >= 0 &&
-        targetColumn < board[0].length &&
-        board[targetRow][targetColumn] === currentValue,
-      );
-    if (!neighbour) break;
-
-    const mergedValue = currentValue * 2;
-    board[current.row][current.column] = null;
-    board[neighbour.row][neighbour.column] = mergedValue;
-    current = neighbour;
+  while (lane.length >= 2 && lane.at(-1) === lane.at(-2)) {
+    const merged = (lane.pop() ?? 0) * 2;
+    lane[lane.length - 1] = merged;
+    score += merged;
     combo += 1;
-    score += mergedValue;
-    maxValue = Math.max(maxValue, mergedValue);
-    events.push({ type: "merged", at: current, value: mergedValue });
+    maxValue = Math.max(maxValue, merged);
+    events.push({ type: "merged", column, row: lane.length - 1, value: merged });
   }
 
-  const gameOver = board[0].every((cell) => cell !== null);
+  const gameOver = columns.some((candidate) => candidate.length >= state.maxRows);
   if (gameOver) events.push({ type: "game_over" });
-
-  return { state: { board, score, maxValue, combo, gameOver }, events };
+  return { state: { ...state, columns, score, maxValue, combo, gameOver }, events };
 }

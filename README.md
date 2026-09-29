@@ -106,12 +106,12 @@ page — TODO tracé dans `arcade-adapter.ts`.
 ## Number Bloom — shooter de fusions
 
 `/games/number-shooter` est un jeu original de fusion de nombres, mobile et desktop.
-Il ne reprend ni visuels, ni sons, ni code de la référence citée. La variante est une
-grille **5 × 8** : le bloc tiré rejoint le bas de la colonne, puis fusionne avec un
-voisin identique. Pour lever toute ambiguïté, le moteur pur applique toujours la
-priorité **gauche → bas → droite → haut** et recommence depuis le bloc produit. Chaque
-fusion produit son événement/animation propre. Une partie se termine lorsqu'aucune
-colonne ne peut plus recevoir de bloc.
+Il ne reprend ni visuels, ni sons, ni code de la référence citée. La variante observée
+et reproduite est composée de **5 couloirs verticaux** : les piles sont suspendues au
+plafond et le bloc actif est tiré depuis le lanceur inférieur. Il s'arrête sous la pile
+de son couloir, puis fusionne seulement avec la valeur identique rencontrée au point
+d'impact. Les chaînes remontent verticalement et chaque étape possède son animation
+propre. Une partie se termine quand une pile atteint la profondeur du lanceur.
 
 ### Lancer et tester
 
