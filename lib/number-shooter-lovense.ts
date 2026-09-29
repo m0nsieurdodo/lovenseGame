@@ -46,7 +46,7 @@ export class GameModeClient {
   }
 
   async sendPattern(toyId: string, strengths: number[], intervalMs = 200): Promise<void> {
-    await this.transport.post({
+    const response = (await this.transport.post({
       command: "Pattern",
       rule: `V:1;F:v;S:${Math.max(101, intervalMs)}#`,
       strength: strengths.map((strength) => Math.max(0, Math.min(20, Math.round(strength)))).join(";"),
@@ -54,7 +54,8 @@ export class GameModeClient {
       timeSec: 2,
       toy: toyId,
       apiVer: 2,
-    });
+    })) as { code?: number; message?: string };
+    if (response.code !== undefined && response.code !== 200) throw new Error(response.message || `Lovense Remote a refusé le motif (${response.code})`);
   }
 
   async stop(toyId?: string): Promise<void> {
@@ -81,7 +82,7 @@ export class NumberShooterHaptics {
   private busy = false;
   private pending?: { priority: number; strengths: number[]; resolve: () => void };
 
-  constructor(private readonly client: GameModeClient) {}
+  constructor(private readonly client: GameModeClient, private readonly onError?: (message: string) => void) {}
 
   configure(configuration: HapticConfiguration) {
     this.configuration = {
@@ -130,6 +131,8 @@ export class NumberShooterHaptics {
         await this.client.sendPattern(this.configuration.toyId, task.strengths);
         await delay(2000 + this.configuration.restMs);
       }
+    } catch (error) {
+      this.onError?.(error instanceof Error ? error.message : "La commande Lovense a échoué.");
     } finally {
       task.resolve();
       const next = this.stopped ? undefined : this.pending;

@@ -56,7 +56,7 @@ export function shootBlock(state: NumberShooterState, column: number, value: num
     const merged = currentValue * 2;
     board[current.row][current.column] = null;
     board[neighbour.row][neighbour.column] = merged;
-    current = neighbour;
+    current = settleAgainstCeiling(board, neighbour);
     score += merged;
     combo += 1;
     maxValue = Math.max(maxValue, merged);
@@ -66,4 +66,18 @@ export function shootBlock(state: NumberShooterState, column: number, value: num
   const gameOver = board[state.maxRows - 1].some((cell) => cell !== null);
   if (gameOver) events.push({ type: "game_over" });
   return { state: { board, score, maxValue, combo, gameOver, maxRows: state.maxRows }, events };
+}
+
+/** Blocks are suspended from the ceiling. Removing one during a merge leaves no
+ * holes: every affected lane, and any pre-existing loose lane, compacts upward. */
+function settleAgainstCeiling(board: NumberBoard, tracked: { row: number; column: number }) {
+  let trackedRow = tracked.row;
+  for (let column = 0; column < LANE_COUNT; column += 1) {
+    if (column === tracked.column) {
+      trackedRow = board.slice(0, tracked.row + 1).filter((row) => row[column] !== null).length - 1;
+    }
+    const values = board.map((row) => row[column]).filter((value): value is number => value !== null);
+    board.forEach((row, rowIndex) => { row[column] = values[rowIndex] ?? null; });
+  }
+  return { row: trackedRow, column: tracked.column };
 }

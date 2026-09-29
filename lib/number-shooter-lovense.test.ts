@@ -53,6 +53,11 @@ describe("Number Shooter Lovense adapter", () => {
     });
   });
 
+  it("reports a rejected Pattern command instead of silently treating it as a vibration", async () => {
+    const transport: CommandTransport = { post: async () => ({ code: 400, message: "toy unreachable" }) };
+    await expect(new GameModeClient(transport).sendPattern("lush", [4, 0])).rejects.toThrow("toy unreachable");
+  });
+
   it("stops immediately and ignores all later effects until rearmed", async () => {
     const transport = new FakeTransport();
     const haptics = new NumberShooterHaptics(new GameModeClient(transport));

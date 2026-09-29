@@ -69,7 +69,7 @@ export function NumberShooterGame() {
       const first = found.find((toy) => toy.supportsVibrate)?.id ?? "";
       setToyId(first);
       if (first) {
-        const director = new NumberShooterHaptics(client);
+        const director = new NumberShooterHaptics(client, (reason) => setConnectionMessage(`Vibration non envoyée : ${reason}`));
         director.configure({ toyId: first, maxIntensity, restMs, enabledEvents });
         haptics.current = director;
         setConnectionMessage("Jouet Vibrate détecté. Sélectionne-le ci-dessous.");
@@ -154,10 +154,18 @@ export function NumberShooterGame() {
         maxIntensity={maxIntensity} maxAllowed={maxAllowed} setMaxIntensity={setMaxIntensity}
         allowAboveTwelve={allowAboveTwelve} setAllowAboveTwelve={setAllowAboveTwelve}
         restMs={restMs} setRestMs={setRestMs} enabledEvents={enabledEvents} setEnabledEvents={setEnabledEvents}
-        preview={(value) => { haptics.current?.rearm(); void haptics.current?.playMerge(value, 3); }}
+        preview={(value) => {
+          if (!activeToy || !haptics.current) {
+            setConnectionMessage("Aucun jouet Vibrate sélectionné : connecte puis choisis un jouet avant le test.");
+            return;
+          }
+          haptics.current.rearm();
+          setConnectionMessage("Test de vibration envoyé au jouet sélectionné.");
+          void haptics.current.playMerge(value, 3);
+        }}
       />
     }>
-      <style>{`@keyframes number-bloom-shot { from { transform: translateY(0) scale(.92); opacity: 1; } to { transform: translateY(-74vh) scale(1); opacity: .15; } } @keyframes number-bloom-merge { 0%,100% { transform: scale(1); filter: brightness(1); } 45% { transform: scale(1.17); filter: brightness(1.7); } }`}</style>
+      <style>{`@keyframes number-bloom-shot { from { transform: translateY(0) scale(.92); opacity: 1; } to { transform: translateY(-74vh) scale(1); opacity: .15; } } @keyframes number-bloom-merge { 0% { transform: scale(.7); filter: brightness(2.8) saturate(1.8); box-shadow: 0 0 0 0 #fff, 0 0 28px #00e5ff; } 38% { transform: scale(1.19); filter: brightness(1.45) saturate(1.35); box-shadow: 0 0 0 10px #ffffff22, 0 0 34px #c13cff; } 100% { transform: scale(1); filter: brightness(1); box-shadow: inset 0 2px 5px #fff5, 0 4px 7px #0007; } }`}</style>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <Hud title="SCORE" value={game.score} /><div className="rounded-lg border border-[#554d80] bg-[#18122d] px-3 py-1 text-center"><span className="block text-[8px] tracking-[.18em] text-muted">OBJECTIF</span><b className="text-lg text-amber-300">512</b></div><Hud title="MAX" value={game.maxValue} />
       </div>
@@ -185,7 +193,7 @@ function Lane({ board, column, maxRows, selected, fill, mergeKey }: { board: Num
 
 function NumberBlock({ value, active = false, compact = false, flying = false }: { value: number; active?: boolean; compact?: boolean; flying?: boolean }) {
   const palette = value >= 256 ? "from-amber-400 to-orange-500" : value >= 64 ? "from-rose-500 to-red-500" : value >= 16 ? "from-violet-500 to-fuchsia-500" : value >= 4 ? "from-blue-500 to-cyan-400" : "from-teal-400 to-cyan-300";
-  return <span className={`flex h-full w-full items-center justify-center rounded-md border border-white/20 bg-gradient-to-br ${palette} font-black text-white shadow-[inset_0_2px_5px_#fff5,0_4px_7px_#0007] ${compact ? "min-h-7 text-sm" : "text-[clamp(.78rem,4.6vw,1.55rem)]"} ${active ? "animate-[pulse_.35s_ease-in-out_2]" : ""} ${flying ? "aspect-square max-h-12 max-w-12 text-xl" : ""}`}>{value}</span>;
+  return <span className={`flex h-full w-full items-center justify-center rounded-md border border-white/20 bg-gradient-to-br ${palette} font-black text-white shadow-[inset_0_2px_5px_#fff5,0_4px_7px_#0007] ${compact ? "min-h-7 text-sm" : "text-[clamp(.78rem,4.6vw,1.55rem)]"} ${active ? "animate-[number-bloom-merge_460ms_cubic-bezier(.16,1,.3,1)_both]" : ""} ${flying ? "aspect-square max-h-12 max-w-12 text-xl" : ""}`}>{value}</span>;
 }
 
 function Hud({ title, value }: { title: string; value: number }) { return <div className="rounded-lg border border-line bg-[#0d0b20] px-3 py-1.5"><span className="block text-[8px] tracking-[.18em] text-muted">{title}</span><b className="font-mono text-xl leading-none tabular-nums">{value}</b></div>; }
