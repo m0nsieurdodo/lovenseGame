@@ -21,6 +21,7 @@ export const GAMES: GameMeta[] = [
   { id: "scanline", name: "Scanline", tagline: "Suis la ligne, tiens le tempo", icon: "♫", accent: "cyan", href: "/games/scanline", ready: true },
   { id: "neon-tiles", name: "Neon Tiles", tagline: "Tape les tuiles, garde le combo", icon: "▮", accent: "rose", href: "/games/neon-tiles", ready: true },
   { id: "descente", name: "Descente", tagline: "Roguelike : le risque EST l'intensité", icon: "🕳️", accent: "violet", href: "/games/descente", ready: true },
+  { id: "number-shooter", name: "Number Bloom", tagline: "Vise, fusionne, fais éclore les combos", icon: "◈", accent: "rose", href: "/games/number-shooter", ready: true },
 ];
 
 export function getGame(id: string): GameMeta | undefined {

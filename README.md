@@ -102,3 +102,67 @@ page — TODO tracé dans `arcade-adapter.ts`.
 - Warm-up : fond léger qui monte avec le niveau · curseur « Intensité max » pour calibrer
 
 > Le V1 (Tetris single-file `index.html`) reste disponible dans l'historique git.
+
+## Number Bloom — shooter de fusions
+
+`/games/number-shooter` est un jeu original de fusion de nombres, mobile et desktop.
+Il ne reprend ni visuels, ni sons, ni code de la référence citée. La variante est une
+grille **5 × 8** : le bloc tiré rejoint le bas de la colonne, puis fusionne avec un
+voisin identique. Pour lever toute ambiguïté, le moteur pur applique toujours la
+priorité **gauche → bas → droite → haut** et recommence depuis le bloc produit. Chaque
+fusion produit son événement/animation propre. Une partie se termine lorsqu'aucune
+colonne ne peut plus recevoir de bloc.
+
+### Lancer et tester
+
+```bash
+npm install
+npm test
+npm run build
+npm run dev -- --hostname 0.0.0.0
+```
+
+Sur le téléphone connecté au même Wi-Fi, ouvrir `http://IP_DU_PC:3000`, où `IP_DU_PC`
+est l'adresse LAN affichée par le système. Le jeu est immédiatement jouable en **mode
+démo** : aucune connexion ni donnée Lovense n'est requise. Les tests couvrent le
+placement, les réactions en chaîne, le score, la défaite, ainsi que l'adaptateur avec
+un faux transport Lovense.
+
+### Connecter Lovense Remote (test réel à faire par le joueur)
+
+1. Dans Lovense Remote, ouvrir **Discover → Game Mode**, puis activer **Enable LAN**.
+2. Mettre le téléphone/ordinateur et Lovense Remote sur le même réseau local.
+3. Dans l'onglet **Réglages** de Number Bloom, cocher volontairement « Connecter
+   Lovense », saisir l'adresse affichée par Game Mode (IP seule ou URL HTTPS), puis
+   choisir « Tester la connexion ».
+4. Choisir uniquement un jouet présenté comme compatible **Vibrate**.
+
+L'intégration utilise `GetToys`, la capacité `fullFunctionNames`, `Function: Stop` et
+`Pattern` de la Standard API/Game Mode. Les motifs sont envoyés une fois par événement,
+en séquence, avec une durée API finie de 2 secondes ; ils ne sont pas pilotés image par
+image. Les valeurs par défaut sont plafonnées à **12/20**. Dépasser 12/20 demande une
+case d'autorisation explicite. Un délai de repos et la désactivation de chaque groupe
+d'événements sont réglables dans le jeu.
+
+Le bouton **ARRÊT IMMÉDIAT** reste visible : il envoie `Stop`, annule les effets en
+attente et verrouille les nouveaux effets jusqu'à une reprise explicite. Pause, fin de
+partie et démontage de la page font aussi un Stop. Une fermeture brutale d'onglet ne
+peut toutefois pas garantir une requête réseau : c'est pourquoi chaque motif a une
+durée finie.
+
+### Limites navigateur et relais local
+
+Le navigateur contacte directement l'URL HTTPS locale fournie par Lovense Remote. Si
+le test échoue en raison de CORS, d'un certificat HTTPS ou d'une politique réseau, ne
+contournez pas ces protections et ne publiez jamais l'API Lovense. Le relais optionnel
+inclus est réservé au navigateur du PC (il écoute seulement `127.0.0.1`) :
+
+```bash
+LOVENSE_REMOTE_URL=https://192-168-1-20.lovense.club:30010 npm run lovense-relay
+```
+
+Saisir ensuite `http://127.0.0.1:8787` dans le jeu. Il ne doit jamais être publié,
+ni modifié pour écouter sur Internet ou le LAN ; sur mobile, employer l'accès HTTPS
+direct à Lovense Remote. Le projet reste sans jeton développeur côté client. Cette
+version n'affirme **pas** une validation matérielle : elle exige un test sur le jouet
+réel par le joueur après la démonstration simulée.
