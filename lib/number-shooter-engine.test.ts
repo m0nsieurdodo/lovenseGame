@@ -10,28 +10,28 @@ describe("Number Shooter engine", () => {
     expect(result.events).toEqual([{ type: "landed", column: 0, row: 1, value: 2 }]);
   });
 
-  it("merges a matching horizontal neighbour at the impact row", () => {
+  it("keeps a horizontal fusion in the lane where the player placed the block", () => {
     const state = createGame({ board: [[2, null, null, null, null]], maxRows: 7 });
     const result = shootBlock(state, 1, 2);
 
-    expect(result.state.board[0].slice(0, 2)).toEqual([4, null]);
+    expect(result.state.board[0].slice(0, 2)).toEqual([null, 4]);
     expect(result.events).toEqual([
       { type: "landed", column: 1, row: 0, value: 2 },
-      { type: "merged", column: 0, row: 0, value: 4 },
+      { type: "merged", column: 1, row: 0, value: 4 },
     ]);
   });
 
   it("resolves a cascade through adjacent equal values", () => {
-    const state = createGame({ board: [[4, 2, null, null, null]], maxRows: 7 });
+    const state = createGame({ board: [[null, null, 4, null, null], [null, 2, null, null, null]], maxRows: 7 });
     const result = shootBlock(state, 2, 2);
 
-    expect(result.state.board[0].slice(0, 3)).toEqual([8, null, null]);
+    expect(result.state.board[0].slice(0, 3)).toEqual([null, null, 8]);
     expect(result.state.score).toBe(12);
     expect(result.state.combo).toBe(2);
     expect(result.events).toEqual([
-      { type: "landed", column: 2, row: 0, value: 2 },
-      { type: "merged", column: 1, row: 0, value: 4 },
-      { type: "merged", column: 0, row: 0, value: 8 },
+      { type: "landed", column: 2, row: 1, value: 2 },
+      { type: "merged", column: 2, row: 1, value: 4 },
+      { type: "merged", column: 2, row: 0, value: 8 },
     ]);
   });
 
@@ -47,7 +47,7 @@ describe("Number Shooter engine", () => {
     const state = createGame({ board: [[2, null, null, null, null], [null, 4, null, null, null]], maxRows: 7 });
     const result = shootBlock(state, 0, 2);
 
-    expect(result.state.board[0].slice(0, 2)).toEqual([null, 8]);
+    expect(result.state.board[0].slice(0, 2)).toEqual([8, null]);
     expect(result.state.board.slice(1).every((row) => row[0] === null && row[1] === null)).toBe(true);
   });
 

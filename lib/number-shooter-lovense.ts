@@ -70,6 +70,11 @@ export interface HapticConfiguration {
   enabledEvents: Record<"low" | "medium" | "high" | "reward", boolean>;
 }
 
+export interface NumberShooterHapticClient {
+  sendPattern(toyId: string, strengths: number[], intervalMs?: number): Promise<void>;
+  stop(toyId?: string): Promise<void>;
+}
+
 const DEFAULT_CONFIGURATION: HapticConfiguration = {
   maxIntensity: 12,
   restMs: 650,
@@ -82,7 +87,7 @@ export class NumberShooterHaptics {
   private busy = false;
   private pending?: { priority: number; strengths: number[]; resolve: () => void };
 
-  constructor(private readonly client: GameModeClient, private readonly onError?: (message: string) => void) {}
+  constructor(private readonly client: NumberShooterHapticClient, private readonly onError?: (message: string) => void) {}
 
   configure(configuration: HapticConfiguration) {
     this.configuration = {

@@ -197,6 +197,26 @@ class LovenseController {
     this.schedule(() => this.toBaseline(), durMs);
   }
 
+  /** Motif borné pour les jeux à événements. Il réutilise l'adresse, les toys
+      actifs et le plafond d'intensité déjà configurés dans le Hub. */
+  async playPattern(strengths: number[], intervalMs = 200) {
+    if (this.mock || !this.connected) throw new Error("Lovense Remote n'est pas connecté dans le Hub.");
+    const strength = strengths
+      .slice(0, 50)
+      .map((value) => Math.max(0, Math.min(20, Math.round(value * this.scale))))
+      .join(";");
+    const responses = await Promise.all(this.targets().map((toy) => this.post({
+      command: "Pattern",
+      rule: `V:1;F:v;S:${Math.max(101, intervalMs)}#`,
+      strength,
+      timeSec: 2,
+      toy,
+      apiVer: 2,
+    })));
+    const failed = responses.find((response: { code?: number; message?: string }) => response?.code !== 200);
+    if (failed) throw new Error(failed.message || `Lovense Remote a refusé le motif (${failed.code ?? "inconnu"})`);
+  }
+
   /** Climax : montée en pulsations jusqu'à 100% (gros événement gameplay). */
   climax() {
     this.cancelScheduled();
