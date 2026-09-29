@@ -65,7 +65,7 @@ class LovenseController {
   private async post(body: Record<string, unknown>) {
     const res = await fetch(`${this.base}/command`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-platform": "Lovense Arcade" },
       body: JSON.stringify(body),
     });
     return res.json();
