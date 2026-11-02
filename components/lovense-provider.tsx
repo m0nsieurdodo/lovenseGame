@@ -86,6 +86,11 @@ export function LovenseProvider({ children }: { children: ReactNode }) {
   const update = (patch: Partial<Settings>) => setSettings((prev) => ({ ...prev, ...patch }));
 
   const connect = async () => {
+    if (!settings.ip.trim()) {
+      setStatus("error");
+      setStatusText("Saisis l’adresse IP locale de Lovense Remote.");
+      return;
+    }
     setStatus("connecting");
     setStatusText("Connexion…");
     const r = await Lovense.connect(settings.ip, settings.transport);
@@ -94,7 +99,7 @@ export function LovenseProvider({ children }: { children: ReactNode }) {
       setStatusText(r.names ? `Connecté · ${r.names}` : "Connecté");
       const list = r.toys ?? [];
       setToys(list);
-      setActiveToys(new Set(list.map((t) => t.id)));
+      setActiveToys(new Set());
     } else {
       setStatus("error");
       setStatusText("Échec — vérifie l'IP / le transport");
@@ -102,6 +107,8 @@ export function LovenseProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleToy = (id: string) => {
+    const toy = toys.find((candidate) => candidate.id === id);
+    if (!toy?.supportsVibrate) return;
     // Effet de bord hors de l'updater (StrictMode double-invoque les updaters).
     const on = !activeToys.has(id);
     Lovense.setToyActive(id, on);

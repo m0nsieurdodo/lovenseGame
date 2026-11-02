@@ -10,7 +10,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  ip: "192.0.2.1",
+  ip: "",
   transport: "https",
   maxIntensity: 100,
   warmup: false,

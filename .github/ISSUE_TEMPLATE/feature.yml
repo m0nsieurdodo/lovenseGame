@@ -1,0 +1,58 @@
+name: Proposer une fonctionnalité
+description: Suggérer une amélioration compatible avec le mode démo et la sécurité haptique
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Décrivez le besoin avant la solution. Toute proposition doit rester utilisable en **mode démo** sans matériel.
+        Ne partagez jamais d’adresse IP Lovense réelle, de jeton, de secret ou d’identifiant d’appareil.
+
+  - type: textarea
+    id: need
+    attributes:
+      label: Besoin utilisateur
+      description: Quel problème ou usage cette fonctionnalité adresse-t-elle ?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Solution proposée
+      description: Décrivez le comportement souhaité, sans donnée privée.
+    validations:
+      required: true
+
+  - type: textarea
+    id: demo-mode
+    attributes:
+      label: Expérience en mode démo
+      description: Comment la fonctionnalité reste-t-elle testable et compréhensible sans appareil Lovense ?
+    validations:
+      required: true
+
+  - type: textarea
+    id: haptic-safety
+    attributes:
+      label: Sécurité haptique
+      description: Précisez les bornes d’intensité et de durée, le consentement, la sérialisation des effets, l’arrêt immédiat et les conditions de coupure applicables.
+      placeholder: Aucun effet haptique / mesures de sécurité proposées
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+      description: Quelles solutions plus simples ou sans matériel avez-vous considérées ?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Vérification des données
+      options:
+        - label: Ma proposition ne contient aucune adresse IP réelle, aucun jeton, secret, identifiant d’appareil ou autre donnée privée.
+          required: true

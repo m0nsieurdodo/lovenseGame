@@ -1,0 +1,75 @@
+name: Signaler un bug
+description: Décrire un problème reproductible sans partager de donnée privée
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci pour le signalement. Commencez si possible par reproduire le problème en **mode démo**, sans matériel.
+        Ne partagez jamais d’adresse IP Lovense réelle, de jeton, de secret, d’identifiant d’appareil ni de capture qui en contient.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Description
+      description: Que se passe-t-il, et quel comportement attendiez-vous ?
+      placeholder: Décrivez le résultat observé puis le résultat attendu.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Étapes de reproduction
+      description: Donnez une procédure minimale avec des valeurs fictives ou masquées.
+      placeholder: |
+        1. Ouvrir…
+        2. Sélectionner…
+        3. Observer…
+    validations:
+      required: true
+
+  - type: dropdown
+    id: demo-mode
+    attributes:
+      label: Reproduction en mode démo
+      options:
+        - Oui, le problème se produit en mode démo
+        - Non, le problème concerne uniquement la connexion Lovense
+        - Non testé
+    validations:
+      required: true
+
+  - type: input
+    id: game
+    attributes:
+      label: Jeu ou écran concerné
+      placeholder: "Par exemple : Number Bloom, HUB, Réglages"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environnement
+      description: Navigateur, version, système et type d’appareil d’affichage. N’indiquez aucune adresse réseau.
+      placeholder: Firefox 130, Android 15, téléphone
+    validations:
+      required: true
+
+  - type: textarea
+    id: haptic-safety
+    attributes:
+      label: Impact haptique et sécurité
+      description: Indiquez si une sortie haptique inattendue, un arrêt défaillant, une intensité incorrecte ou une commande persistante a été observé. N’ajoutez aucun secret ni identifiant matériel.
+      placeholder: Aucun impact haptique / description factuelle de l’impact
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Vérification des données
+      options:
+        - label: J’ai retiré les adresses IP réelles, jetons, secrets, identifiants d’appareil et autres données privées.
+          required: true

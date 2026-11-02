@@ -4,7 +4,7 @@
 
    POST {base}/command
    GetToys : { command:"GetToys" }
-   Vibrate : { command:"Function", action:"Vibrate:N" (0-20), timeSec, toy:"", apiVer:1 }
+   Vibrate : { command:"Function", action:"Vibrate:N" (0-20), timeSec, toy:"<id>", apiVer:1 }
    Stop    : { command:"Function", action:"Stop", timeSec:0, toy:"", apiVer:1 }
 
    Quand aucun toy n'est connecté, le contrôleur bascule en mock
@@ -19,6 +19,7 @@ export interface ToyInfo {
   name: string; // ex. "solace", "gemini"
   nickName?: string;
   battery?: number;
+  supportsVibrate: boolean;
 }
 
 export interface ConnectResult {
@@ -86,12 +87,13 @@ class LovenseController {
             name: t.name || id,
             nickName: t.nickName || undefined,
             battery: typeof t.battery === "number" ? t.battery : undefined,
+            supportsVibrate: Array.isArray(t.fullFunctionNames) && t.fullFunctionNames.includes("Vibrate"),
           }));
         } catch {
           /* noop */
         }
-        // Par défaut, tous les toys détectés reçoivent les commandes.
-        this.active = new Set(this.toys.map((t) => t.id));
+        // La découverte ne vaut jamais consentement : sélection explicite requise.
+        this.active.clear();
         const names = this.toys.map((t) => t.nickName || t.name).join(" + ");
         return { ok: true, names, toys: this.toys };
       }
@@ -112,6 +114,7 @@ class LovenseController {
   /** Active/désactive un toy ; un toy désactivé est immédiatement stoppé. */
   setToyActive(id: string, on: boolean) {
     if (on) {
+      if (!this.toys.some((toy) => toy.id === id && toy.supportsVibrate)) return;
       this.active.add(id);
       if (this.scheduledTimers.size === 0) this.toBaseline();
     } else {
@@ -122,10 +125,9 @@ class LovenseController {
     }
   }
 
-  /** Cibles des commandes : [""] = broadcast (tous), sinon un envoi par toy actif. */
+  /** Cibles des commandes ordinaires : uniquement les ids activés explicitement. */
   private targets(): string[] {
-    if (this.toys.length === 0 || this.active.size === this.toys.length) return [""];
-    return this.toys.filter((t) => this.active.has(t.id)).map((t) => t.id);
+    return this.toys.filter((t) => t.supportsVibrate && this.active.has(t.id)).map((t) => t.id);
   }
 
   private async sendFunction(action: string) {

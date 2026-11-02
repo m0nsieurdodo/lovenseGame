@@ -78,6 +78,7 @@ export function SettingsPanel({ showConnection = true }: { showConnection?: bool
             {toys.map((t) => {
               const on = activeToys.has(t.id);
               const label = t.nickName || t.name;
+              const compatible = t.supportsVibrate;
               return (
                 <label
                   key={t.id}
@@ -88,11 +89,12 @@ export function SettingsPanel({ showConnection = true }: { showConnection?: bool
                   <span className="flex items-center gap-2 capitalize">
                     <span>{TOY_ICONS[t.name.toLowerCase()] ?? "💠"}</span>
                     {label}
+                    {!compatible && <span className="text-[10px] normal-case text-muted">Vibration non prise en charge</span>}
                     {typeof t.battery === "number" && t.battery >= 0 && (
                       <span className="font-mono text-[10px] text-muted">{t.battery}%</span>
                     )}
                   </span>
-                  <input type="checkbox" checked={on} onChange={() => toggleToy(t.id)} className="accent-rose" />
+                  <input type="checkbox" checked={on} disabled={!compatible} onChange={() => toggleToy(t.id)} className="accent-rose disabled:cursor-not-allowed" />
                 </label>
               );
             })}
