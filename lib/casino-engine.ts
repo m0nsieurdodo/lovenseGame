@@ -121,6 +121,7 @@ export class CasinoEngine {
   freeSpins = 0;
   history: HistoryEntry[] = [];
   private seq = 0;
+  private mysteryTimer: ReturnType<typeof setTimeout> | null = null;
 
   canSpin() {
     return this.freeSpins > 0 || this.credits >= SPIN_COST;
@@ -230,17 +231,17 @@ export class CasinoEngine {
     // Vibration mystère : arrive en décalé, quand on ne l'attend plus.
     if (r.mystery) {
       const { pct } = r.mystery;
-      setTimeout(() => Lovense.pulse(pct, 400 + Math.random() * 1100), 500 + Math.random() * 700);
+      if (this.mysteryTimer !== null) clearTimeout(this.mysteryTimer);
+      this.mysteryTimer = setTimeout(() => {
+        this.mysteryTimer = null;
+        Lovense.pulse(pct, 400 + Math.random() * 1100);
+      }, 500 + Math.random() * 700);
     }
   }
 
-  /** Joue une séquence d'impulsions enchaînées. */
+  /** Joue une séquence d'impulsions enchaînées (annulable par STOP / pause). */
   private burst(steps: [number, number][]) {
-    let t = 0;
-    for (const [pct, ms] of steps) {
-      setTimeout(() => Lovense.pulse(pct, ms + 150), t);
-      t += ms;
-    }
+    Lovense.sequence(steps);
   }
 
   recharge() {
@@ -248,6 +249,8 @@ export class CasinoEngine {
   }
 
   destroy() {
+    if (this.mysteryTimer !== null) clearTimeout(this.mysteryTimer);
+    this.mysteryTimer = null;
     Lovense.mute();
   }
 }

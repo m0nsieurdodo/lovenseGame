@@ -8,6 +8,7 @@
      point marqué             → 80% pendant 0.5s
      perte (point adverse)    → stop
    ============================================================ */
+import { FixedStep } from "./fixed-step";
 import { Lovense } from "./lovense";
 import { saveBestScore } from "./settings";
 import type { Overlay } from "./engine-types";
@@ -50,6 +51,7 @@ export class PongEngine {
   private rafId: number | null = null;
   private moveDir = 0; // -1 / 0 / 1 (clavier)
   private pointerX: number | null = null;
+  private clock = new FixedStep();
 
   constructor(private canvas: HTMLCanvasElement, private hooks: EngineHooks) {
     this.ctx = canvas.getContext("2d")!;
@@ -85,8 +87,10 @@ export class PongEngine {
     this.pointerX = x;
   }
 
-  private loop = () => {
-    if (this.canPlay()) this.step();
+  private loop = (t: number) => {
+    // Pas fixe à 60/s : même vitesse de jeu quel que soit le taux de rafraîchissement.
+    const steps = this.clock.advance(t, this.canPlay());
+    for (let i = 0; i < steps && this.canPlay(); i++) this.step();
     this.draw();
     this.rafId = requestAnimationFrame(this.loop);
   };

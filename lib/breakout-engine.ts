@@ -7,6 +7,7 @@
      combo 20        → vibration continue ~80%
      game over       → stop
    ============================================================ */
+import { FixedStep } from "./fixed-step";
 import { Lovense } from "./lovense";
 import { saveBestScore } from "./settings";
 import type { Overlay } from "./engine-types";
@@ -104,8 +105,11 @@ export class BreakoutEngine {
   }
 
   /* ---------- boucle ---------- */
-  private loop = () => {
-    if (this.canPlay()) this.step();
+  private clock = new FixedStep();
+  private loop = (t: number) => {
+    // Pas fixe à 60/s : même vitesse de jeu quel que soit le taux de rafraîchissement.
+    const steps = this.clock.advance(t, this.canPlay());
+    for (let i = 0; i < steps && this.canPlay(); i++) this.step();
     this.draw();
     this.rafId = requestAnimationFrame(this.loop);
   };

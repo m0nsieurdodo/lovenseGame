@@ -7,6 +7,14 @@
    Vibrate : { command:"Function", action:"Vibrate:N" (0-20), timeSec, toy:"<id>", apiVer:1 }
    Stop    : { command:"Function", action:"Stop", timeSec:0, toy:"", apiVer:1 }
 
+   Garanties du transport :
+   - une seule commande de niveau en vol à la fois, la plus récente gagne
+     (un Vibrate ne peut plus arriver après un Stop à cause du réseau) ;
+   - aucune vibration de durée infinie : chaque Vibrate porte un timeSec fini,
+     rafraîchi tant que le niveau est maintenu. Si l'onglet plante ou perd le
+     réseau, l'appareil s'arrête seul au bout de HOLD_SEC ;
+   - chaque requête a un délai maximal.
+
    Quand aucun toy n'est connecté, le contrôleur bascule en mock
    (log console + événements visuels) pour développer/tester sans matériel.
    ============================================================ */
@@ -22,11 +30,30 @@ export interface ToyInfo {
   supportsVibrate: boolean;
 }
 
+export type ConnectFailure = "invalid-ip" | "mixed-content" | "timeout" | "unreachable" | "refused";
+
 export interface ConnectResult {
   ok: boolean;
+  reason?: ConnectFailure;
   names?: string;
   toys?: ToyInfo[];
   raw?: unknown;
+}
+
+/** Durée de vie d'une commande Vibrate côté appareil (homme-mort). */
+export const HOLD_SEC = 4;
+/** Rafraîchissement d'un niveau maintenu, avant l'expiration de HOLD_SEC. */
+export const KEEPALIVE_MS = 2500;
+const REQUEST_TIMEOUT_MS = 4000;
+
+/** IPv4 stricte : la valeur est interpolée dans une URL, rien d'autre ne doit passer. */
+export function parseIPv4(value: string): string | null {
+  const parts = value.trim().split(".");
+  if (parts.length !== 4) return null;
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part) || Number(part) > 255) return null;
+  }
+  return parts.map(Number).join(".");
 }
 
 class LovenseController {
@@ -40,6 +67,13 @@ class LovenseController {
   private toys: ToyInfo[] = [];
   private active = new Set<string>(); // ids des toys qui reçoivent les commandes
   private listeners = new Set<VibeListener>();
+
+  /* ---- file d'envoi « le plus récent gagne » ---- */
+  private desiredLevel = 0; // niveau 0-20 voulu sur l'appareil
+  private sentLevel = 0; // dernier niveau envoyé
+  private resend = false; // forcer un renvoi (nouvelle cible, keep-alive)
+  private inFlight: Promise<void> | null = null;
+  private keepAlive: ReturnType<typeof setTimeout> | null = null;
 
   /* ---- abonnement UI (barre de vibration, feedback visuel) ---- */
   onVibe(fn: VibeListener): () => void {
@@ -59,7 +93,7 @@ class LovenseController {
 
   private buildBase(ip: string, transport: Transport) {
     if (transport === "http") return `http://${ip}:20010`;
-    const dashed = ip.trim().replace(/\./g, "-"); // IP en tirets → cert lovense.club valide
+    const dashed = ip.replace(/\./g, "-"); // IP en tirets → cert lovense.club valide
     return `https://${dashed}.lovense.club:30010`;
   }
 
@@ -68,12 +102,24 @@ class LovenseController {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-platform": "Lovense Arcade" },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
+    if (!res.ok) throw new Error(`Lovense Remote a répondu HTTP ${res.status}`);
     return res.json();
   }
 
   async connect(ip: string, transport: Transport): Promise<ConnectResult> {
-    this.base = this.buildBase(ip, transport);
+    const host = parseIPv4(ip);
+    if (!host) {
+      this.connected = false;
+      return { ok: false, reason: "invalid-ip" };
+    }
+    // Une page servie en HTTPS ne peut pas appeler une API HTTP : le navigateur bloque.
+    if (transport === "http" && typeof location !== "undefined" && location.protocol === "https:") {
+      this.connected = false;
+      return { ok: false, reason: "mixed-content" };
+    }
+    this.base = this.buildBase(host, transport);
     try {
       const data = await this.post({ command: "GetToys" });
       if (data && data.code === 200) {
@@ -98,10 +144,11 @@ class LovenseController {
         return { ok: true, names, toys: this.toys };
       }
       this.connected = false;
-      return { ok: false, raw: data };
+      return { ok: false, reason: "refused", raw: data };
     } catch (err) {
       this.connected = false;
-      return { ok: false, raw: err };
+      const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+      return { ok: false, reason: timedOut ? "timeout" : "unreachable", raw: err };
     }
   }
 
@@ -116,7 +163,9 @@ class LovenseController {
     if (on) {
       if (!this.toys.some((toy) => toy.id === id && toy.supportsVibrate)) return;
       this.active.add(id);
+      this.resend = true; // la nouvelle cible doit recevoir le niveau courant
       if (this.scheduledTimers.size === 0) this.toBaseline();
+      else this.flush();
     } else {
       this.active.delete(id);
       if (!this.mock && this.connected) {
@@ -130,26 +179,69 @@ class LovenseController {
     return this.toys.filter((t) => t.supportsVibrate && this.active.has(t.id)).map((t) => t.id);
   }
 
-  private async sendFunction(action: string) {
+  private async sendLevel(lv: number) {
     const tg = this.targets();
     if (tg.length === 0) return; // aucun toy actif → rien à envoyer
-    await Promise.all(
-      tg.map((toy) => this.post({ command: "Function", action, timeSec: 0, toy, apiVer: 1 })),
-    );
+    const command =
+      lv <= 0
+        ? { command: "Function", action: "Stop", timeSec: 0, apiVer: 1 }
+        : { command: "Function", action: `Vibrate:${lv}`, timeSec: HOLD_SEC, apiVer: 1 };
+    await Promise.all(tg.map((toy) => this.post({ ...command, toy })));
+  }
+
+  private clearKeepAlive() {
+    if (this.keepAlive !== null) clearTimeout(this.keepAlive);
+    this.keepAlive = null;
+  }
+
+  /** Vide la file : une commande à la fois, en sautant directement au dernier niveau voulu. */
+  private flush() {
+    if (this.inFlight || this.mock || !this.connected) return;
+    if (this.desiredLevel === this.sentLevel && !this.resend) return;
+    this.inFlight = this.drain().finally(() => {
+      this.inFlight = null;
+      // Un ordre arrivé entre la fin de la boucle et ce point ne doit pas rester en attente.
+      this.flush();
+    });
+  }
+
+  private async drain() {
+    while (!this.mock && this.connected && (this.desiredLevel !== this.sentLevel || this.resend)) {
+      const lv = this.desiredLevel;
+      this.resend = false;
+      this.clearKeepAlive();
+      try {
+        await this.sendLevel(lv);
+      } catch {
+        /* Réseau instable → on ignore : la prochaine impulsion corrigera, et le
+           timeSec fini empêche l'appareil de rester bloqué en vibration. */
+      }
+      this.sentLevel = lv;
+      if (lv > 0 && this.desiredLevel === lv && !this.resend) {
+        this.keepAlive = setTimeout(() => {
+          this.keepAlive = null;
+          this.resend = true;
+          this.flush();
+        }, KEEPALIVE_MS);
+      }
+    }
   }
 
   /** Bascule volontairement en mode démo (sans matériel). */
   useMock() {
     this.mock = true;
     this.connected = false;
+    this.clearKeepAlive();
+    this.desiredLevel = 0;
+    this.sentLevel = 0;
   }
 
   private level(pct: number) {
     return Math.max(0, Math.min(20, Math.round(pct / 5))); // 0-100% → 0-20
   }
 
-  /** Envoi direct, intensité max appliquée. */
-  private async raw(pct: number) {
+  /** Niveau demandé, intensité max appliquée. L'envoi réseau passe par la file. */
+  private raw(pct: number) {
     const scaled = pct * this.scale;
     this.emit(scaled);
     if (this.mock) {
@@ -157,13 +249,8 @@ class LovenseController {
       return;
     }
     if (!this.connected) return;
-    const lv = this.level(scaled);
-    try {
-      if (lv <= 0) await this.sendFunction("Stop");
-      else await this.sendFunction(`Vibrate:${lv}`);
-    } catch {
-      /* réseau instable → on ignore, la prochaine impulsion corrigera */
-    }
+    this.desiredLevel = this.level(scaled);
+    this.flush();
   }
 
   private toBaseline() {
@@ -199,6 +286,19 @@ class LovenseController {
     this.schedule(() => this.toBaseline(), durMs);
   }
 
+  /** Séquence d'impulsions [pct, durée ms] puis retour au fond. Contrairement à
+      des setTimeout posés par un jeu, un STOP ou une pause l'annule entièrement. */
+  sequence(steps: ReadonlyArray<readonly [number, number]>) {
+    this.cancelScheduled();
+    let t = 0;
+    for (const [pct, durMs] of steps.slice(0, 50)) {
+      if (t === 0) this.raw(pct);
+      else this.schedule(() => this.raw(pct), t);
+      t += Math.max(1, durMs);
+    }
+    this.schedule(() => this.toBaseline(), t);
+  }
+
   /** Motif borné pour les jeux à événements. Il réutilise l'adresse, les toys
       actifs et le plafond d'intensité déjà configurés dans le Hub. */
   async playPattern(strengths: number[], intervalMs = 200) {
@@ -221,28 +321,20 @@ class LovenseController {
 
   /** Climax : montée en pulsations jusqu'à 100% (gros événement gameplay). */
   climax() {
-    this.cancelScheduled();
-    const seq: [number, number][] = [
+    this.sequence([
       [100, 260],
       [60, 110],
       [100, 300],
       [70, 120],
       [100, 420],
-    ];
-    let t = 0;
-    seq.forEach(([p, d]) => {
-      this.schedule(() => this.raw(p), t);
-      t += d;
-    });
-    this.schedule(() => this.toBaseline(), t);
+    ]);
   }
 
   /** Silence temporaire (pause / game over) — garde la config. */
   mute() {
     this.cancelScheduled();
-    if (!this.mock && this.connected) {
-      this.sendFunction("Stop").catch(() => {});
-    }
+    this.desiredLevel = 0;
+    this.flush();
     this.emit(0);
   }
   unmute() {
@@ -254,14 +346,22 @@ class LovenseController {
     this.cancelScheduled();
     this.baseline = 0;
     this.warmup = false;
-    if (!this.mock && this.connected) {
-      try {
-        await this.post({ command: "Function", action: "Stop", timeSec: 0, toy: "", apiVer: 1 });
-      } catch {
-        /* noop */
-      }
-    }
+    this.clearKeepAlive();
+    this.desiredLevel = 0;
+    this.sentLevel = 0;
+    this.resend = false;
     this.emit(0);
+    if (this.mock || !this.connected) return;
+    const stopAll = () =>
+      this.post({ command: "Function", action: "Stop", timeSec: 0, toy: "", apiVer: 1 }).catch(() => {});
+    // Le Stop part tout de suite, sans attendre la file.
+    const pending = this.inFlight;
+    await stopAll();
+    // Une commande déjà en vol a pu atterrir après ce Stop : on recoupe derrière elle.
+    if (pending) {
+      await pending;
+      await stopAll();
+    }
   }
 
   /* ---- calibrage global ---- */
