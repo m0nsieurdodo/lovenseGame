@@ -32,8 +32,8 @@
   --radius-pill: 999px;
 
   /* Typo */
-  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Space Mono", ui-monospace, "SFMono-Regular", monospace;
+  --font-display: var(--font-space-grotesk), "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), "Space Mono", ui-monospace, "SFMono-Regular", monospace;
 }
 
 *,

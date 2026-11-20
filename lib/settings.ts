@@ -6,7 +6,6 @@ export interface Settings {
   transport: Transport;
   maxIntensity: number; // 0-100
   warmup: boolean;
-  enabled: boolean; // toggle ON/OFF global des vibrations
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -14,7 +13,6 @@ export const DEFAULT_SETTINGS: Settings = {
   transport: "https",
   maxIntensity: 100,
   warmup: false,
-  enabled: true,
 };
 
 const KEY = "lovense-arcade:settings";
@@ -24,10 +22,23 @@ export function loadSettings(): Settings {
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    return sanitizeSettings(JSON.parse(raw));
   } catch {
     return DEFAULT_SETTINGS;
   }
+}
+
+/** Le stockage local peut contenir n'importe quoi (ancienne version, édition
+    manuelle) : on ne garde que des valeurs du bon type et dans les bornes. */
+export function sanitizeSettings(value: unknown): Settings {
+  const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  const max = typeof v.maxIntensity === "number" && Number.isFinite(v.maxIntensity) ? v.maxIntensity : DEFAULT_SETTINGS.maxIntensity;
+  return {
+    ip: typeof v.ip === "string" ? v.ip.slice(0, 64) : DEFAULT_SETTINGS.ip,
+    transport: v.transport === "http" ? "http" : "https",
+    maxIntensity: Math.max(0, Math.min(100, Math.round(max))),
+    warmup: v.warmup === true,
+  };
 }
 
 export function saveSettings(s: Settings) {
@@ -45,7 +56,11 @@ const SCORE_KEY = "lovense-arcade:best";
 export function loadBestScores(): Record<string, number> {
   if (typeof window === "undefined") return {};
   try {
-    return JSON.parse(window.localStorage.getItem(SCORE_KEY) || "{}");
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(SCORE_KEY) || "{}");
+    if (!parsed || typeof parsed !== "object") return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])),
+    );
   } catch {
     return {};
   }

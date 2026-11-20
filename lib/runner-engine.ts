@@ -8,6 +8,7 @@
      vie perdue    → forte vibration puis la puissance chute
      game over     → gros hit puis stop
    ============================================================ */
+import { FixedStep } from "./fixed-step";
 import { Lovense } from "./lovense";
 import { saveBestScore } from "./settings";
 import type { Overlay } from "./engine-types";
@@ -28,16 +29,9 @@ const AMBIENT_PATTERNS: Array<(power: number) => void> = [
   // stable : un pulse simple à l'intensité courante
   (power) => Lovense.pulse(power, 220),
   // double-tap : deux impulsions rapprochées
-  (power) => {
-    Lovense.pulse(power * 0.7, 100);
-    setTimeout(() => Lovense.pulse(power, 140), 140);
-  },
+  (power) => Lovense.sequence([[power * 0.7, 100], [0, 40], [power, 140]]),
   // montée : rampe en trois paliers
-  (power) => {
-    Lovense.pulse(power * 0.45, 90);
-    setTimeout(() => Lovense.pulse(power * 0.75, 90), 100);
-    setTimeout(() => Lovense.pulse(power, 160), 200);
-  },
+  (power) => Lovense.sequence([[power * 0.45, 100], [power * 0.75, 100], [power, 160]]),
 ];
 
 export class RunnerEngine {
@@ -67,6 +61,7 @@ export class RunnerEngine {
   private over = false;
   private rafId: number | null = null;
   private lastAmbientAt = 0;
+  private clock = new FixedStep();
 
   constructor(private canvas: HTMLCanvasElement, private hooks: EngineHooks) {
     this.ctx = canvas.getContext("2d")!;
@@ -85,7 +80,9 @@ export class RunnerEngine {
   }
 
   private loop = (t: number) => {
-    if (this.canPlay()) this.step(t);
+    // Pas fixe à 60/s : même vitesse de jeu quel que soit le taux de rafraîchissement.
+    const steps = this.clock.advance(t, this.canPlay());
+    for (let i = 0; i < steps && this.canPlay(); i++) this.step(t);
     this.draw();
     this.rafId = requestAnimationFrame(this.loop);
   };

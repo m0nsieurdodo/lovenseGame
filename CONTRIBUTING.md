@@ -22,6 +22,7 @@ npm run dev
 Avant toute pull request, exécutez :
 
 ```bash
+npm run typecheck
 npm test
 npm run build
 ```
@@ -42,6 +43,9 @@ Ajoutez des tests déterministes pour les moteurs, règles de score, courbes hap
 - Exigez une action explicite avant toute découverte ou connexion.
 - Sélectionnez les appareils selon leurs capacités annoncées ; ne ciblez pas automatiquement tous les appareils.
 - Bornez l’intensité, utilisez des commandes de durée finie et évitez tout envoi à chaque frame.
+- Ne posez pas de `setTimeout` autour d’un appel haptique : passez par `Lovense.sequence()` ou `Lovense.pulse()`, que l’arrêt d’urgence sait annuler.
+- Si votre jeu utilise Espace, déclarez `usesSpace: true` dans `lib/games.ts` ; sinon Espace reste un arrêt d’urgence.
+- Pour un jeu en `requestAnimationFrame`, avancez la simulation avec `FixedStep` (`lib/fixed-step.ts`) : la vitesse ne doit pas dépendre de la fréquence de l’écran.
 - Sérialisez les effets et fournissez un arrêt immédiat qui vide la file et impose un réarmement explicite.
 - Coupez la sortie sur pause, fin de partie, démontage et erreur fatale.
 - N’exposez jamais l’API Lovense, un relais local ou des secrets sur Internet. Un relais doit rester lié à `127.0.0.1`.

@@ -48,6 +48,9 @@ Lorsqu’un appareil est utilisé :
 - la connexion passe par Lovense Remote et son API locale Game Mode ;
 - l’utilisateur choisit explicitement la connexion et l’appareil compatible ;
 - les intensités sont bornées et les motifs ont une durée finie ;
+- le contrôleur partagé n’envoie jamais de vibration sans durée : chaque commande expire seule côté appareil au bout de quelques secondes et n’est prolongée que tant que la page la maintient ;
+- une seule commande est en vol à la fois et la plus récente l’emporte, pour qu’un ordre retardé par le réseau ne puisse pas arriver après un arrêt ;
+- **Échap** coupe tout, partout. **Espace** aussi, sauf dans les jeux qui s’en servent pour jouer (Tetris, Runner, Scanline) et quand le focus est dans un champ ou sur un bouton ; chaque jeu affiche en plus un bouton **■ STOP** ;
 - les effets sont déclenchés par des événements de jeu plutôt que par chaque image rendue ;
 - les jeux concernés exposent un arrêt immédiat et coupent les effets lors des pauses, fins de partie ou démontages de page ;
 - l’API locale ne doit jamais être publiée sur Internet ni exposée sur le réseau local par un relais non sécurisé.
@@ -74,11 +77,12 @@ L’application est alors disponible sur <http://localhost:3000>.
 ### Vérifications
 
 ```bash
+npm run typecheck
 npm test
 npm run build
 ```
 
-La suite Vitest couvre notamment les moteurs purs, le scoring, les gestes, les courbes haptiques et des transports simulés.
+Ces trois commandes sont rejouées par la CI GitHub Actions sur chaque pull request. La suite Vitest couvre notamment les moteurs purs, le scoring, les gestes, les courbes haptiques et des transports simulés.
 
 ## Trois implémentations de référence
 
@@ -119,7 +123,7 @@ En cas de blocage CORS, certificat ou politique réseau, ne contournez pas les p
 LOVENSE_REMOTE_URL=https://192-168-1-20.lovense.club:30010 npm run lovense-relay
 ```
 
-Il ne doit jamais être publié ni configuré pour écouter sur Internet ou sur le LAN. Sur mobile, utilisez le chemin HTTPS local pris en charge par Lovense Remote.
+Le relais refuse toute requête qui ne vient pas de l’application locale (`Origin` `http://localhost:3000` ou `http://127.0.0.1:3000`, `Content-Type: application/json`, commandes `GetToys`, `Function` et `Pattern` uniquement) : écouter sur `127.0.0.1` ne suffit pas, car n’importe quel site ouvert dans le navigateur peut émettre une requête vers une adresse locale. Il ne doit jamais être publié ni configuré pour écouter sur Internet ou sur le LAN. Sur mobile, utilisez le chemin HTTPS local pris en charge par Lovense Remote.
 
 ## Contribuer
 

@@ -27,7 +27,7 @@ export function GameShell({
   immersive?: boolean;
   showGlobalSettings?: boolean;
 }) {
-  const { status } = useLovense();
+  const { status, stop } = useLovense();
   const [tab, setTab] = useState<Tab>("game");
 
   const switchTab = (t: Tab) => {
@@ -43,19 +43,34 @@ export function GameShell({
       {/* Header */}
       <header className="flex flex-none flex-col gap-2">
         <div className="flex items-center justify-between gap-2.5">
-          <Link href="/" className="text-lg text-muted transition hover:text-cyan" aria-label="Retour au hub">
+          <Link href="/" className="flex-none whitespace-nowrap text-lg text-muted transition hover:text-cyan" aria-label="Retour au hub">
             ‹ Hub
           </Link>
-          <h1 className="text-neon whitespace-nowrap text-[17px] font-extrabold uppercase tracking-[2px]">{title}</h1>
-          <span className="flex items-center gap-1.5 text-[11px] text-muted">
-            <StatusDot state={status} />
-            {status === "connected" ? "ON" : "OFF"}
+          <h1 className="text-neon min-w-0 truncate text-[17px] font-extrabold uppercase tracking-[2px]">{title}</h1>
+          <span className="flex flex-none items-center gap-2 text-[11px] text-muted">
+            <span className="flex items-center gap-1.5">
+              <StatusDot state={status} />
+              <span className="sr-only">Lovense {status === "connected" ? "connecté" : "non connecté"}</span>
+            </span>
+            {/* Arrêt d'urgence toujours à portée de doigt, sans passer par l'onglet Réglages. */}
+            <button
+              type="button"
+              onClick={stop}
+              aria-label="Arrêt d'urgence des vibrations"
+              title="Arrêt d'urgence (Échap)"
+              className="cursor-pointer whitespace-nowrap rounded-lg border border-danger bg-[#2a0e18] px-2.5 py-1.5 text-[11px] font-extrabold tracking-wide text-danger transition hover:brightness-125 active:scale-95"
+            >
+              ■ STOP
+            </button>
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-line bg-[#0d0b20] p-1">
+        <div role="tablist" aria-label="Jeu ou réglages" className="grid grid-cols-2 gap-1.5 rounded-xl border border-line bg-[#0d0b20] p-1">
           {(["game", "settings"] as Tab[]).map((t) => (
             <button
               key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
               onClick={() => switchTab(t)}
               className={`rounded-[9px] py-2.5 text-[13px] font-bold tracking-wide transition ${
                 tab === t ? "bg-gradient-to-r from-[#1c1840] to-[#2a1550] text-ink glow-low" : "text-muted"

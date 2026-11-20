@@ -1,8 +1,10 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Lovense, type ToyInfo } from "@/lib/lovense";
-import { isEmergencyStopKey, shouldStopWhenDocumentHidden } from "@/lib/haptic-safety";
+import { Lovense, type ConnectFailure, type ToyInfo } from "@/lib/lovense";
+import { gameForPath } from "@/lib/games";
+import { isEmergencyStopKey, isInteractiveTarget, shouldStopWhenDocumentHidden } from "@/lib/haptic-safety";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from "@/lib/settings";
 
 type Status = "idle" | "connecting" | "connected" | "error";
@@ -21,6 +23,14 @@ interface LovenseCtx {
   stop: () => void;
 }
 
+const CONNECT_ERRORS: Record<ConnectFailure, string> = {
+  "invalid-ip": "Adresse invalide — attendu : une IPv4 locale, ex. 192.168.1.20",
+  "mixed-content": "HTTP direct impossible depuis une page HTTPS — choisis le transport HTTPS",
+  timeout: "Pas de réponse — même Wi-Fi ? Game Mode activé dans Lovense Remote ?",
+  unreachable: "Injoignable — vérifie l'IP, le transport et que Game Mode est activé",
+  refused: "Lovense Remote a refusé la demande — relance Game Mode",
+};
+
 const Ctx = createContext<LovenseCtx | null>(null);
 
 export function useLovense() {
@@ -37,6 +47,9 @@ export function LovenseProvider({ children }: { children: ReactNode }) {
   const [toys, setToys] = useState<ToyInfo[]>([]);
   const [activeToys, setActiveToys] = useState<Set<string>>(new Set());
   const loaded = useRef(false);
+  const pathname = usePathname();
+  const spaceIsGameKey = useRef(false);
+  spaceIsGameKey.current = gameForPath(pathname ?? "")?.usesSpace === true;
 
   // Chargement initial depuis localStorage (client only) + abonnement au niveau de vibration.
   useEffect(() => {
@@ -49,14 +62,19 @@ export function LovenseProvider({ children }: { children: ReactNode }) {
     return off;
   }, []);
 
-  // Kill switch global : STOP sur Échap/Espace, masquage ou fermeture de l'onglet.
+  // Kill switch global : STOP sur Échap (toujours), Espace (sauf s'il sert à jouer
+  // ou à actionner le contrôle qui a le focus), masquage ou fermeture de l'onglet.
   useEffect(() => {
     const emergencyStop = () => {
       void Lovense.stop();
       setSettings((prev) => ({ ...prev, warmup: false }));
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!isEmergencyStopKey(event.key)) return;
+      const context = {
+        spaceIsGameKey: spaceIsGameKey.current,
+        targetIsInteractive: isInteractiveTarget(event.target as HTMLElement | null),
+      };
+      if (!isEmergencyStopKey(event.key, context)) return;
       event.preventDefault();
       emergencyStop();
     };
@@ -102,7 +120,9 @@ export function LovenseProvider({ children }: { children: ReactNode }) {
       setActiveToys(new Set());
     } else {
       setStatus("error");
-      setStatusText("Échec — vérifie l'IP / le transport");
+      setStatusText(CONNECT_ERRORS[r.reason ?? "unreachable"]);
+      setToys([]);
+      setActiveToys(new Set());
     }
   };
 
